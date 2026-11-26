@@ -1,0 +1,720 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pin the City</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Instrument+Sans:wght@400;600&display=swap">
+<style>
+/* Night flight: a globe floating in space, an airport split-flap board top-left, controls docked bottom-centre.
+   Deliberately one dark visual world, so colours are set once on :root. */
+:root{
+  --night:#07101d; --space:#0c1a2e; --ocean:#0e2238; --ocean-hi:#1c3d60;
+  --land-0:#34556a; --land-1:#3b5e71; --land-2:#2f4d62; --land-3:#416476; --land-4:#38596c;
+  --land-edge:#7ea2b3; --coast:#9fe3d8; --grat:#244563;
+  --ink:#e9eff5; --muted:#8fa4b8; --line:#253a52; --panel:rgba(9,19,33,.82);
+  --amber:#ffb23f; --amber-dim:#9c7438; --on-amber:#201505; --teal:#4fe0c6;
+  --tile:#17243a; --tile-lo:#111c2e; --seam:#03070d;
+  --c-bull:#4fe0c6; --c-great:#86b8ff; --c-good:#cfa8ff; --c-off:#ff8f80;
+  --paper:#dde9e3; --paper-ink:#1b3245; --bull:#0d7560; --great:#1f4b88; --good:#6c3fa3; --off:#ad3329;
+  --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:ui-monospace,"SF Mono",Consolas,monospace;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:radial-gradient(ellipse at 55% 45%,var(--space),var(--night) 72%) fixed var(--night);color:var(--ink);font-family:var(--body);overflow:hidden}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+
+#stage,#stars,#earth,#globe,#fx{position:fixed;inset:0;width:100%;height:100%}
+#globe{display:block;touch-action:none;cursor:grab}
+#globe.aim{cursor:crosshair}
+#globe.grabbing{cursor:grabbing}
+#fx{pointer-events:none;z-index:12}
+#stage.shake{animation:shake .5s cubic-bezier(.36,.07,.19,.97)}
+@keyframes shake{10%,90%{transform:translate(-2px,1px)}20%,80%{transform:translate(4px,-2px)}30%,50%,70%{transform:translate(-6px,3px)}40%,60%{transform:translate(6px,-3px)}}
+
+.arc-glow{fill:none;stroke:var(--amber);stroke-opacity:.18;stroke-width:9;stroke-linecap:round}
+.arc{fill:none;stroke:var(--amber);stroke-width:2.2;stroke-linecap:round;stroke-dasharray:1 6}
+.pin .shadow{fill:#000}
+.pin .body path{stroke:var(--night);stroke-width:1.5}
+.pin .dot{fill:var(--night)}
+.pin.guess .body path{fill:var(--amber)}
+.pin.answer .body path{fill:var(--teal)}
+.pin .halo{fill:none;stroke:var(--teal);stroke-width:2;transform-box:fill-box;transform-origin:center;animation:halo 1.8s ease-out infinite}
+.pin.guess .halo{display:none}
+@keyframes halo{from{transform:scale(.4);opacity:1}to{transform:scale(2.6);opacity:0}}
+.plane path{fill:var(--ink);filter:drop-shadow(0 2px 3px rgba(0,0,0,.6))}
+
+/* Departure board */
+.board{position:fixed;z-index:3;top:calc(16px + env(safe-area-inset-top,0px));left:max(16px,env(safe-area-inset-left,0px));
+  width:min(400px,calc(100% - 32px));box-sizing:border-box;padding:16px 16px 14px;
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.board-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;color:var(--muted);font-size:.85rem}
+.total{font:800 1.7rem/1 var(--display);color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.total small{font:600 .75rem var(--body);color:var(--muted);margin-left:4px;letter-spacing:0}
+.tier{margin:12px 0 8px;font-size:.85rem;color:var(--amber);display:flex;align-items:center;gap:8px}
+.tier::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 10px currentColor}
+.flaps{display:flex;flex-wrap:wrap;gap:.16em .42em;font-size:var(--fs,40px);min-height:1.18em}
+.word{display:flex;gap:.06em}
+.flap{display:inline-grid;place-items:center;width:.8em;height:1.18em;border-radius:.09em;
+  background:linear-gradient(var(--tile) 0 49.4%,var(--seam) 49.4% 50.6%,var(--tile-lo) 50.6%);
+  color:var(--amber-dim);font:800 1em/1 var(--display);box-shadow:inset 0 -2px 0 rgba(0,0,0,.35)}
+.flap.tick{animation:tick 60ms linear}
+.flap.set{color:var(--amber);text-shadow:0 0 14px rgba(255,178,63,.45)}
+@keyframes tick{50%{transform:scaleY(.55)}}
+.legs{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:14px 0 0;padding:0;list-style:none}
+.legs li{height:6px;border-radius:3px;background:var(--line);transition:background .4s}
+.legs li.now{background:var(--amber);animation:pulse 1.4s ease-in-out infinite}
+.legs li[class^="t-"]{background:currentColor}
+@keyframes pulse{50%{opacity:.35}}
+.country{margin:8px 0 0;font-size:.95rem;font-weight:600;color:var(--teal);min-height:1.2em}
+.country.in{animation:rise .5s ease-out both}
+.best{margin:8px 0 0;font-size:.78rem;color:var(--muted);min-height:1em}
+
+.t-bull{color:var(--c-bull)} .t-great{color:var(--c-great)} .t-good{color:var(--c-good)} .t-off{color:var(--c-off)}
+
+/* Dock */
+.dock{position:fixed;z-index:3;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));
+  width:min(420px,calc(100% - 32px));display:grid;gap:10px;justify-items:center;text-align:center}
+.pop{position:absolute;bottom:100%;margin-bottom:14px;left:50%;transform:translateX(-50%)}
+.readout{min-height:2.4rem;display:flex;gap:16px;align-items:baseline;justify-content:center;font:800 2.1rem/1.1 var(--display);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.readout small{font:600 .85rem var(--body);color:var(--muted);margin-left:4px;letter-spacing:0}
+.readout .pts{color:var(--amber);animation:rise .4s ease-out both}
+.go{width:100%;padding:14px 20px;border:0;border-radius:999px;background:var(--amber);color:var(--on-amber);font:600 1.05rem var(--body);cursor:pointer;
+  box-shadow:0 10px 34px -10px rgba(255,178,63,.75);transition:transform .15s,box-shadow .15s}
+.go:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 14px 40px -10px rgba(255,178,63,.9)}
+.go:disabled{background:#223247;color:var(--muted);box-shadow:none;cursor:not-allowed}
+.go:focus-visible,.zoom button:focus-visible,.pp-actions button:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+.hint{margin:0;font-size:.8rem;color:var(--muted);min-height:1.2em}
+
+.zoom{position:fixed;z-index:3;right:max(16px,env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);display:grid;gap:8px}
+.zoom button{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:600 1.3rem/1 var(--body);cursor:pointer}
+
+/* Stamps (mid-game pop and passport) */
+.stamp{--r:0deg;--o:1;width:128px;box-sizing:border-box;padding:10px 8px;display:grid;gap:3px;justify-items:center;align-content:center;text-align:center;
+  border:2.5px solid currentColor;border-radius:10px;box-shadow:inset 0 0 0 3px var(--stamp-bg),inset 0 0 0 4.5px currentColor;background:var(--stamp-bg);
+  font-family:var(--display);text-transform:uppercase;letter-spacing:.05em;transform:rotate(var(--r));opacity:var(--o);filter:url(#rough);
+  animation:thunk .5s cubic-bezier(.2,1.5,.35,1) var(--d,0s) both}
+.stamp.t-bull{border-radius:50%;width:132px;aspect-ratio:1}
+.stamp strong{font-size:1.3rem;line-height:1;font-weight:800;text-wrap:balance}
+.stamp small{font-size:.78rem;font-weight:700}
+.pop .stamp{--stamp-bg:rgba(7,16,29,.82)}
+@keyframes thunk{from{opacity:0;transform:scale(2.4) rotate(calc(var(--r) - 16deg))}60%{opacity:1}to{opacity:var(--o);transform:scale(1) rotate(var(--r))}}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}}
+
+/* Final: passport flight log */
+.final{position:fixed;inset:0;z-index:10;overflow:auto;background:rgba(3,8,15,.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.passport{width:min(780px,100%);box-sizing:border-box;padding:clamp(18px,4vw,34px);border-radius:16px;color:var(--paper-ink);display:grid;gap:20px;
+  background:repeating-radial-gradient(circle at 0 0,transparent 0 13px,rgba(27,50,69,.05) 13px 14px),repeating-radial-gradient(circle at 100% 100%,transparent 0 17px,rgba(13,117,96,.05) 17px 18px),var(--paper);
+  box-shadow:0 40px 90px -24px #000;animation:open .7s cubic-bezier(.2,.9,.3,1) both}
+@keyframes open{from{opacity:0;transform:translateY(40px) rotateX(18deg) scale(.96)}}
+.pp-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px 24px}
+.pp-head p{margin:0}
+.pp-label{font-size:.85rem;font-weight:600;opacity:.75}
+.pp-total{font:800 clamp(3.6rem,13vw,6.2rem)/.85 var(--display);font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.pp-of{font-size:.9rem;opacity:.7;margin-top:4px!important}
+.pp-rank{font:800 clamp(1.6rem,5vw,2.3rem)/1 var(--display);text-align:right}
+.pp-best{font-size:.85rem;text-align:right;margin-top:6px!important;opacity:.8}
+.pp-best.pb{opacity:1;color:var(--bull);font-weight:600}
+.routes{width:100%;height:auto;display:block;border-radius:10px;background:rgba(27,50,69,.06)}
+.r-sphere{fill:rgba(27,50,69,.04);stroke:rgba(27,50,69,.18)}
+.r-land{fill:rgba(27,50,69,.16)}
+.r-arc{fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round}
+.r-guess{fill:var(--paper);stroke:currentColor;stroke-width:2}
+.r-target{fill:currentColor}
+.routes text{fill:currentColor;font:800 15px var(--display)}
+.stamps{display:flex;flex-wrap:wrap;justify-content:center;gap:14px 12px}
+.passport .stamp{--stamp-bg:var(--paper);--o:.9;mix-blend-mode:multiply}
+.passport .t-bull{color:var(--bull)} .passport .t-great{color:var(--great)} .passport .t-good{color:var(--good)} .passport .t-off{color:var(--off)}
+.mrz{margin:0;font:600 clamp(.58rem,2.1vw,.92rem)/1.5 var(--mono);letter-spacing:.12em;opacity:.55;overflow-x:auto;white-space:pre;border-top:1px dashed rgba(27,50,69,.3);padding-top:12px}
+.pp-actions{display:flex;flex-wrap:wrap;gap:10px}
+.pp-actions button{flex:1 1 180px;padding:13px 18px;border-radius:999px;font:600 1rem var(--body);cursor:pointer}
+#again{border:0;background:var(--paper-ink);color:var(--paper)}
+#copy{border:2px solid var(--paper-ink);background:transparent;color:var(--paper-ink)}
+.pp-credit{margin:0;font-size:.75rem;opacity:.6}
+#shareText{margin:0;padding:10px;border-radius:8px;background:rgba(27,50,69,.08);font:500 .9rem/1.5 var(--mono);white-space:pre-wrap;user-select:all}
+
+@media (max-width:899px){ .zoom{top:auto;transform:none;bottom:calc(150px + env(safe-area-inset-bottom,0px))} }
+@media (prefers-reduced-motion:reduce){*,*::before{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="4"/><feDisplacementMap in="SourceGraphic" scale="2.4"/></filter>
+</svg>
+
+<div id="stage"><canvas id="stars"></canvas><canvas id="earth"></canvas><svg id="globe" aria-label="Globe. Drag to spin, click to drop your pin."></svg></div>
+<canvas id="fx" aria-hidden="true"></canvas>
+
+<header class="board" id="board">
+  <div class="board-top"><span id="round">Preparing for departure</span><span class="total"><span id="total">0</span><small>pts</small></span></div>
+  <p class="tier" id="tier">Loading the globe</p>
+  <h1 class="sr-only" id="cityName"></h1>
+  <div class="flaps" id="flaps" aria-hidden="true"></div>
+  <p class="country" id="country" aria-hidden="true"></p>
+  <ol class="legs" id="legs"><li></li><li></li><li></li><li></li><li></li></ol>
+  <p class="best" id="best"></p>
+</header>
+
+<div class="zoom"><button id="zin" type="button" aria-label="Zoom in">+</button><button id="zout" type="button" aria-label="Zoom out">−</button></div>
+
+<div class="dock" id="dock">
+  <div class="pop" id="pop" hidden></div>
+  <div class="readout" id="readout" aria-live="polite"></div>
+  <button class="go" id="go" type="button" disabled>Lock in guess</button>
+  <p class="hint" id="hint"></p>
+</div>
+
+<section class="final" id="final" hidden aria-labelledby="fTitle">
+  <div class="passport">
+    <div class="pp-head">
+      <div>
+        <p class="pp-label" id="fTitle">Flight log</p>
+        <p class="pp-total" id="fTotal">0</p>
+        <p class="pp-of">of 25,000 points</p>
+      </div>
+      <div>
+        <p class="pp-rank" id="fRank"></p>
+        <p class="pp-best" id="fBest"></p>
+      </div>
+    </div>
+    <svg class="routes" id="routes" viewBox="0 0 960 480" role="img" aria-label="Your five guesses and the real cities"></svg>
+    <div class="stamps" id="stamps"></div>
+    <p class="mrz" id="mrz" aria-hidden="true"></p>
+    <div class="pp-actions">
+      <button id="again" type="button">Fly again</button>
+      <button id="copy" type="button">Copy result</button>
+    </div>
+    <pre id="shareText" hidden></pre>
+    <p class="pp-credit">City data from GeoNames (CC BY 4.0). Map outlines from Natural Earth.</p>
+  </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script>
+// ---------- Game data ----------
+let TIERS = []; // five tiers of [name, country, lat, lng], loaded from cities.json
+const SCALE_KM = 1500;   // higher = more forgiving; 5000 * e^(-km / SCALE_KM)
+const ROUNDS = 5, MAX = 5000 * ROUNDS;
+const RECENT_LIMIT = 60; // cities to avoid repeating across games
+const GRADES = [         // ~125 km, ~410 km, ~1,040 km
+  {min: 4600, key: "bull",  label: "Bullseye",    emoji: "🎯"},
+  {min: 3800, key: "great", label: "Great guess", emoji: "🟩"},
+  {min: 2500, key: "good",  label: "Not bad",     emoji: "🟨"},
+  {min: 0,    key: "off",   label: "Way off",     emoji: "🟥"},
+];
+const RANKS = [[21000, "Cartographer"], [16000, "Navigator"], [10000, "Frequent flyer"], [5000, "Tourist"], [0, "Lost luggage"]];
+const grade = pts => GRADES.find(g => pts >= g.min);
+
+// ---------- Helpers ----------
+const $ = id => document.getElementById(id);
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const fmt = n => Math.round(n).toLocaleString("en-GB");
+const rand = (a, b) => a + Math.random() * (b - a);
+const store = { // localStorage can be blocked, so never let it break the game
+  get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+let recent = store.get("pin-recent", []), best = store.get("pin-best", 0);
+
+function countTo(el, from, to, dur = 800) {
+  if (reduced) { el.textContent = fmt(to); return; }
+  const t0 = performance.now();
+  (function tick(now) {
+    const t = Math.min(1, (now - t0) / dur);
+    el.textContent = fmt(from + (to - from) * d3.easeCubicOut(t));
+    if (t < 1) requestAnimationFrame(tick);
+  })(t0);
+}
+
+// ---------- Globe setup ----------
+const svg = d3.select("#globe"), node = svg.node();
+const arcGlow = svg.append("path").attr("class", "arc-glow");
+const arcP   = svg.append("path").attr("class", "arc");
+const PIN = "M0,0 C-2,-6 -9,-10 -9,-17 a9,9 0 1,1 18,0 C9,-10 2,-6 0,0Z";
+const PLANE = "M0,-9 L2,-3 L9,1 L9,3 L2,1 L1.5,6 L4,8 L4,9.5 L0,8.5 L-4,9.5 L-4,8 L-1.5,6 L-2,1 L-9,3 L-9,1 L-2,-3Z";
+function buildPin(cls) {
+  const g = svg.append("g").attr("class", `pin ${cls}`).attr("display", "none");
+  g.append("ellipse").attr("class", "shadow").attr("rx", 6).attr("ry", 2.2);
+  g.append("circle").attr("class", "halo").attr("r", 10);
+  const body = g.append("g").attr("class", "body");
+  body.append("path").attr("d", PIN);
+  body.append("circle").attr("class", "dot").attr("cy", -17).attr("r", 3.6);
+  return g;
+}
+const guessPin = buildPin("guess"), answerPin = buildPin("answer");
+const plane = svg.append("g").attr("class", "plane").attr("display", "none");
+plane.append("path").attr("d", PLANE);
+
+const projection = d3.geoOrthographic().clipAngle(90).precision(0).rotate([-10, -20, 0]);
+const path = d3.geoPath(projection);
+let W, H, dpr, cx, cy, base, availW, availH, zf = 1, zGoal = 1; // zf eases towards zGoal each frame
+const clampZ = z => Math.max(.85, Math.min(14, z));
+
+// ---------- Animation loop ----------
+// Every animation is a step function in `anims`; the globe only redraws when something marked it dirty.
+const anims = new Set();
+let dirty = true, last = performance.now(), spinning = false;
+function animate(dur, step = () => {}, ease = d3.easeCubicInOut) {
+  return new Promise(res => {
+    if (reduced || !dur) { step(1); dirty = true; res(); return; }
+    const t0 = performance.now();
+    anims.add(now => {
+      const t = Math.min(1, (now - t0) / dur);
+      step(ease(t)); dirty = true;
+      if (t >= 1) { res(); return false; }
+      return true;
+    });
+  });
+}
+function frame(now) {
+  const dt = Math.min(64, now - last); last = now;
+  for (const a of [...anims]) if (!a(now)) anims.delete(a);
+  if (spinning && !reduced) { const r = projection.rotate(); projection.rotate([r[0] + dt * .006, r[1], r[2]]); dirty = true; }
+  if (!busy && Math.abs(zGoal - zf) > 1e-4) { // smooth zoom: close ~15% of the gap per frame, whatever the frame rate
+    zf += (zGoal - zf) * (reduced ? 1 : 1 - Math.exp(-dt / 110)); dirty = true;
+  }
+  if (dirty) { render(now); dirty = false; }
+  stepFx(dt);
+  requestAnimationFrame(frame);
+}
+
+function flyTo(rot, zoom, dur) {
+  const r0 = projection.rotate(), z0 = zf;
+  zGoal = zoom;
+  const dl = ((rot[0] - r0[0]) % 360 + 540) % 360 - 180; // spin the short way round
+  return animate(dur, t => {
+    projection.rotate([r0[0] + dl * t, r0[1] + (rot[1] - r0[1]) * t, 0]);
+    zf = z0 + (zoom - z0) * t;
+  });
+}
+
+// ---------- Rendering ----------
+// The globe itself is drawn on a canvas (fast); pins, the route and the plane stay in the SVG above it.
+const earth = $("earth"), ec = earth.getContext("2d");
+const gp = d3.geoPath(projection);
+const shape2d = obj => { const p = new Path2D(); gp.context(p)(obj); return p; }; // projected outline as a reusable canvas path
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${n >> 8 & 255},${n & 255},${a})`; };
+const C = {ocean: css("--ocean"), oceanHi: css("--ocean-hi"), teal: css("--teal"), coast: css("--coast"),
+           edge: css("--land-edge"), grat: css("--grat"), land: [0, 1, 2, 3, 4].map(i => css(`--land-${i}`))};
+const GRAT = d3.geoGraticule10(), TAU = Math.PI * 2;
+
+// Two levels of detail chosen by zoom: 110m outlines zoomed out, simplified 50m (every island) from 3x in.
+// Shapes are stored as small pieces with a bounding circle, so pieces the camera can't see are skipped.
+const maps = {};
+let lod = "lo";
+function piece(g) {
+  const c = d3.geoCentroid(g); let r = 0;
+  const walk = a => typeof a[0] === "number" ? (r = Math.max(r, d3.geoDistance(c, a))) : a.forEach(walk);
+  walk(g.coordinates); return {g, c, r};
+}
+const chunked = (lines, n = 40) => lines.flatMap(l => {   // long coastlines are cut into short runs
+  const out = []; for (let i = 0; i < l.length - 1; i += n) out.push(piece({type: "LineString", coordinates: l.slice(i, i + n + 1)}));
+  return out;
+});
+function addMap(key, topo) {
+  const countries = topojson.feature(topo, topo.objects.countries).features.filter(f => f.geometry);
+  const fills = [[], [], [], [], []]; // one list per tone, each island its own piece
+  countries.forEach((f, i) => {
+    const g = f.geometry;
+    for (const c of g.type === "MultiPolygon" ? g.coordinates : [g.coordinates]) fills[(+f.id || i) % 5].push(piece({type: "Polygon", coordinates: c}));
+  });
+  const lines = keep => chunked(topojson.mesh(topo, topo.objects.countries, keep).coordinates);
+  maps[key] = {countries, fills, land: topojson.feature(topo, topo.objects.land),
+               borders: lines((a, b) => a !== b), coast: lines((a, b) => a === b)};
+  dirty = true;
+}
+function visible(pieces, ctr, view) { // one canvas path of only the pieces in view
+  const p = new Path2D(); gp.context(p);
+  for (const q of pieces) if (d3.geoDistance(q.c, ctr) - q.r < view) gp(q.g);
+  return p;
+}
+
+function drawEarth(now) {
+  const R = projection.scale();
+  ec.setTransform(dpr, 0, 0, dpr, 0, 0); ec.clearRect(0, 0, W, H);
+  const disc = () => { ec.beginPath(); ec.arc(cx, cy, R, 0, TAU); };
+  let g = ec.createRadialGradient(cx, cy, R, cx, cy, R * 1.18);        // atmosphere
+  g.addColorStop(0, rgba(C.teal, .22)); g.addColorStop(1, rgba(C.teal, 0));
+  ec.fillStyle = g; ec.beginPath(); ec.arc(cx, cy, R * 1.18, 0, TAU); ec.fill();
+  g = ec.createRadialGradient(cx - R * .28, cy - R * .4, 0, cx - R * .28, cy - R * .4, R * 1.5); // lit ocean
+  g.addColorStop(0, C.oceanHi); g.addColorStop(1, C.ocean);
+  ec.fillStyle = g; disc(); ec.fill();
+  ec.strokeStyle = C.grat; ec.lineWidth = .6; ec.stroke(shape2d(GRAT));
+
+  lod = maps.hi && zf > (lod === "hi" ? 2.7 : 3) ? "hi" : "lo"; // a little hysteresis, so it doesn't flicker at the threshold
+  const m = maps[lod];
+  if (m) {
+    // How far from the centre of the globe the screen reaches, as an angle on the sphere
+    const reach = Math.max(Math.hypot(cx, cy), Math.hypot(W - cx, cy), Math.hypot(cx, H - cy), Math.hypot(W - cx, H - cy));
+    const view = reach < R ? Math.asin(reach / R) + .02 : Math.PI / 2, ctr = centre();
+    const coast = visible(m.coast, ctr, view);
+    ec.lineJoin = "round";
+    ec.strokeStyle = rgba(C.teal, .09); ec.lineWidth = 7; ec.stroke(coast);   // coastal glow
+    m.fills.forEach((pieces, t) => { ec.fillStyle = C.land[t]; ec.fill(visible(pieces, ctr, view)); });
+    ec.setLineDash([2.5, 2]); ec.strokeStyle = rgba(C.edge, .5); ec.lineWidth = .6; ec.stroke(visible(m.borders, ctr, view)); ec.setLineDash([]);
+    ec.strokeStyle = rgba(C.coast, .8); ec.lineWidth = .9; ec.stroke(coast);
+    const shape = pickedName && pickedShape(lod);
+    if (shape) { // flare up, then settle to a soft highlight
+      const t = reduced ? 1 : Math.min(1, (now - pickedAt) / 1400);
+      const fill = t < .3 ? .2 + .35 * t / .3 : .55 - .35 * (t - .3) / .7, p = shape2d(shape);
+      ec.globalAlpha = Math.min(1, t / .3);
+      ec.fillStyle = rgba(C.teal, fill); ec.fill(p);
+      ec.strokeStyle = C.teal; ec.lineWidth = 1.6; ec.stroke(p);
+      ec.globalAlpha = 1;
+    }
+  }
+  g = ec.createRadialGradient(cx, cy, R * .62, cx, cy, R);              // darker towards the edge, for depth
+  g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,.5)");
+  ec.fillStyle = g; disc(); ec.fill();
+}
+
+// The revealed city's country, found by which outline contains it (no name matching needed)
+let picked = null, pickedName = null, pickedAt = 0;
+function countryAt(ll) {
+  for (const m of [maps.hi, maps.lo].filter(Boolean)) {
+    const f = m.countries.find(f => d3.geoContains(f, ll)); if (f) return f.properties.name;
+  }
+  // Coastal cities can sit just outside the simplified outlines, so probe rings around them
+  for (const r of [.25, .5, 1]) for (let i = 0; i < 8; i++) {
+    const p = [ll[0] + r * Math.cos(i * Math.PI / 4), ll[1] + r * Math.sin(i * Math.PI / 4)];
+    const f = maps.lo.countries.find(f => d3.geoContains(f, p)); if (f) return f.properties.name;
+  }
+  return null;
+}
+const pickedShape = key => maps[key].countries.find(f => f.properties.name === pickedName);
+const centre = () => { const r = projection.rotate(); return [-r[0], -r[1]]; };
+const onFront = ll => d3.geoDistance(ll, centre()) < Math.PI / 2 - .015;
+
+function placePin(g, ll, at, now) {
+  if (!ll || !onFront(ll)) { g.attr("display", "none"); return; }
+  const [x, y] = projection(ll), p = reduced ? 1 : Math.min(1, (now - at) / 550);
+  g.attr("display", null).attr("transform", `translate(${x},${y})`);
+  g.select(".body").attr("transform", `translate(0,${-48 * (1 - d3.easeBounceOut(p))})`);
+  g.select(".shadow").attr("opacity", .15 + .35 * p);
+}
+
+function render(now) {
+  projection.translate([cx, cy]).scale(base * zf);
+  drawEarth(now);
+
+  if (flight && flight.t > 0) {
+    const n = Math.max(2, Math.ceil(64 * flight.t));
+    const line = {type: "LineString", coordinates: d3.range(n + 1).map(i => flight.ip(flight.t * i / n))};
+    const d = path(line) || "";
+    arcP.attr("d", d); arcGlow.attr("d", d);
+  } else { arcP.attr("d", null); arcGlow.attr("d", null); }
+
+  if (flight && flight.t > 0 && flight.t < 1 && onFront(flight.ip(flight.t))) {
+    const a = projection(flight.ip(Math.max(0, flight.t - .005))), b = projection(flight.ip(Math.min(1, flight.t + .005)));
+    const [x, y] = projection(flight.ip(flight.t)), heading = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI + 90;
+    plane.attr("display", null).attr("transform", `translate(${x},${y}) rotate(${heading}) scale(1.4)`);
+  } else plane.attr("display", "none");
+
+  placePin(guessPin, guess, guessAt, now);
+  placePin(answerPin, phase === "revealed" || phase === "done" || targetShown ? target : null, targetAt, now);
+}
+
+// ---------- Effects: confetti, shockwaves, shake ----------
+const fx = $("fx"), ctx = fx.getContext("2d"), stars = $("stars");
+let parts = [], rings = [], fxLive = false;
+const CONFETTI = ["#ffb23f", "#4fe0c6", "#e9eff5", "#ff8f80", "#86b8ff", "#cfa8ff"];
+function confetti(x, y, n, spread = Math.PI * 2, dir = 0, speed = 7) {
+  for (let i = 0; i < n; i++) {
+    const a = dir + (Math.random() - .5) * spread, s = 2 + Math.random() * speed;
+    parts.push({x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 3, a: Math.random() * 6, va: rand(-.3, .3),
+      w: rand(4, 9), h: rand(2, 5), c: CONFETTI[i % CONFETTI.length], life: rand(.8, 1.2)});
+  }
+}
+function shockwaves(x, y, n, c) { for (let i = 0; i < n; i++) rings.push({x, y, r: 6, delay: i * 150, c, life: 1}); }
+function stepFx(dt) {
+  if (!parts.length && !rings.length) { if (fxLive) { ctx.clearRect(0, 0, W, H); fxLive = false; } return; }
+  fxLive = true; ctx.clearRect(0, 0, W, H);
+  const f = dt / 16.7;
+  rings = rings.filter(r => {
+    if (r.delay > 0) { r.delay -= dt; return true; }
+    r.r += 3.4 * f; r.life -= .017 * f;
+    ctx.globalAlpha = Math.max(0, r.life); ctx.strokeStyle = r.c; ctx.lineWidth = 3 * r.life + .5;
+    ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2); ctx.stroke();
+    return r.life > 0;
+  });
+  parts = parts.filter(p => {
+    p.vy += .2 * f; p.vx *= .985; p.x += p.vx * f; p.y += p.vy * f; p.a += p.va * f; p.life -= .007 * f;
+    ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 1.6));
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a); ctx.fillStyle = p.c;
+    ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h * Math.abs(Math.cos(p.a * 1.7)) + .5); ctx.restore();
+    return p.life > 0 && p.y < H + 30;
+  });
+  ctx.globalAlpha = 1;
+}
+function shake() { const s = $("stage"); s.classList.remove("shake"); void s.offsetWidth; s.classList.add("shake"); }
+function celebrate(g) {
+  if (reduced) return;
+  const [x, y] = projection(target), c = getComputedStyle(document.documentElement).getPropertyValue(`--c-${g.key}`).trim();
+  if (g.key === "bull")  { shockwaves(x, y, 3, c); confetti(x, y, 160, Math.PI * 2, 0, 9); shake(); }
+  if (g.key === "great") { shockwaves(x, y, 2, c); confetti(x, y, 70, Math.PI * 2, 0, 6); }
+  if (g.key === "good")  { shockwaves(x, y, 1, c); confetti(x, y, 18, Math.PI * 2, 0, 4); }
+}
+
+function drawStars() {
+  const s = stars.getContext("2d"); let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647; // seeded so stars don't jump on resize
+  s.setTransform(dpr, 0, 0, dpr, 0, 0); s.clearRect(0, 0, W, H); s.fillStyle = "#cfe3ff";
+  for (let i = 0; i < W * H / 2400; i++) {
+    s.globalAlpha = .15 + rnd() * .6; s.beginPath(); s.arc(rnd() * W, rnd() * H, rnd() * 1.1 + .2, 0, Math.PI * 2); s.fill();
+  }
+}
+
+// ---------- Layout ----------
+function layout() {
+  W = innerWidth; H = innerHeight; dpr = Math.min(2, devicePixelRatio || 1);
+  svg.attr("width", W).attr("height", H);
+  for (const c of [fx, stars, earth]) { c.width = W * dpr; c.height = H * dpr; }
+  projection.clipExtent([[-20, -20], [W + 20, H + 20]]); // skip drawing what's off screen when zoomed in
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); drawStars();
+  const b = $("board").getBoundingClientRect(), wide = W >= 900;
+  const left = wide ? b.right : 0, top = wide ? 0 : b.bottom, bottom = H - (wide ? 150 : 165);
+  availW = W - left; availH = bottom - top;
+  cx = (left + W) / 2; cy = (top + bottom) / 2;
+  base = Math.max(70, Math.min(availW, availH) / 2 * .9);
+  $("dock").style.left = `${wide ? cx : W / 2}px`;
+  sizeFlaps(); dirty = true;
+}
+addEventListener("resize", layout);
+
+// ---------- Split-flap board ----------
+const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+let flapTimers = [];
+function setFlaps(text) {
+  flapTimers.forEach(clearInterval); flapTimers = [];
+  const el = $("flaps"); el.textContent = "";
+  let i = 0;
+  for (const word of text.toUpperCase().split(" ")) {
+    const w = document.createElement("span"); w.className = "word";
+    for (const ch of word) {
+      const t = document.createElement("span"); t.className = "flap"; w.append(t);
+      if (reduced) { t.textContent = ch; t.classList.add("set"); continue; }
+      let n = 5 + i++ * 2;
+      const iv = setInterval(() => {
+        t.classList.remove("tick"); void t.offsetWidth; t.classList.add("tick");
+        if (--n <= 0) { t.textContent = ch; t.classList.add("set"); clearInterval(iv); }
+        else t.textContent = CHARS[Math.random() * 26 | 0];
+      }, 60);
+      flapTimers.push(iv);
+    }
+    el.append(w);
+  }
+  sizeFlaps();
+}
+function sizeFlaps() {
+  const el = $("flaps"), words = [...el.children];
+  if (!words.length) return;
+  const longest = Math.max(...words.map(w => w.children.length));
+  el.style.setProperty("--fs", `${Math.min(44, Math.floor(el.clientWidth / (longest * .86 + .2)))}px`);
+}
+
+// ---------- Game state ----------
+let round = 0, total = 0, target, guess, guessAt = 0, targetAt = 0, targetShown = false;
+let phase = "loading", flight = null, busy = false, results = [], cityName = "", cityCountry = "";
+
+function pick(cities) { // prefer cities not seen recently
+  const key = c => `${c[0]}|${c[1]}`;
+  const fresh = cities.filter(c => !recent.includes(key(c)));
+  const pool = fresh.length ? fresh : cities;
+  const city = pool[Math.floor(Math.random() * pool.length)];
+  recent = [key(city), ...recent].slice(0, RECENT_LIMIT);
+  store.set("pin-recent", recent);
+  return city;
+}
+
+function updateLegs() {
+  [...$("legs").children].forEach((li, i) => {
+    li.className = results[i] ? `t-${results[i].g.key}` : (i === round && phase !== "done" ? "now" : "");
+  });
+}
+
+function setHint() {
+  $("hint").textContent = phase !== "guessing" ? "" :
+    guess ? "Tap again to move your pin, or lock it in." : "Drag to spin, scroll or pinch to zoom, tap to drop your pin.";
+}
+
+function start() {
+  round = 0; total = 0; results = [];
+  $("final").hidden = true; $("total").textContent = "0";
+  next();
+}
+
+function next() {
+  const t = TIERS[round], [name, country, lat, lng] = pick(t.cities);
+  cityName = name; cityCountry = country; picked = null; pickedName = null;
+  target = [lng, lat]; guess = null; flight = null; targetShown = false; phase = "guessing";
+  $("pop").hidden = true; $("readout").textContent = "";
+  $("round").textContent = `Round ${round + 1} of ${ROUNDS}`;
+  $("tier").textContent = t.name;
+  $("cityName").textContent = name;
+  $("country").textContent = ""; $("country").classList.remove("in");
+  $("best").textContent = best ? `Personal best ${fmt(best)}` : "";
+  $("go").textContent = "Lock in guess"; $("go").disabled = true;
+  setFlaps(name); updateLegs(); setHint(); layout();
+  node.classList.add("aim");
+  busy = true; spinning = false;
+  flyTo([rand(-180, 180), -18, 0], 1, 1100).then(() => { busy = false; spinning = phase === "guessing"; });
+}
+
+function dropPin(e) {
+  if (phase !== "guessing") return;
+  const x = e.clientX, y = e.clientY;
+  if (Math.hypot(x - cx, y - cy) > projection.scale()) return; // clicked off the globe
+  const ll = projection.invert([x, y]);
+  if (!ll || !isFinite(ll[0])) return;
+  guess = ll; guessAt = performance.now(); spinning = false;
+  animate(620);
+  $("go").disabled = false; setHint();
+}
+
+async function reveal() {
+  phase = "revealing"; busy = true; spinning = false;
+  $("go").disabled = true; setHint(); node.classList.remove("aim");
+  const d = d3.geoDistance(guess, target), km = d * 6371;
+  const pts = Math.round(5000 * Math.exp(-km / SCALE_KM)), g = grade(pts);
+  const ip = d3.geoInterpolate(guess, target), mid = ip(.5);
+
+  // 1. Turn the globe so the whole route is in view
+  const fit = Math.min(availW, availH) * .3 / Math.sin(Math.max(d / 2, .03)) / base;
+  await flyTo([-mid[0], -mid[1], 0], Math.max(1, Math.min(7, fit)), 900);
+
+  // 2. Fly the great-circle route while the distance ticks up
+  flight = {ip, t: 0};
+  $("readout").innerHTML = `<span><span id="kmv">0</span><small>km off</small></span>`;
+  const kmv = $("kmv");
+  await animate(Math.min(1900, 800 + d * 450), t => { flight.t = t; kmv.textContent = fmt(km * t); });
+
+  // 3. Land: show the real city, celebrate, stamp it
+  targetShown = true; targetAt = performance.now(); animate(620);
+  picked = target; pickedName = countryAt(target); pickedAt = performance.now(); animate(1400);
+  $("country").textContent = cityCountry; $("country").classList.add("in");
+  $("cityName").textContent = `${cityName}, ${cityCountry}`;
+  celebrate(g);
+  total += pts;
+  results.push({name: cityName, km, pts, g, guess, target});
+  $("readout").insertAdjacentHTML("beforeend", `<span class="pts">+<span id="ptsv">0</span></span>`);
+  countTo($("ptsv"), 0, pts, 900); countTo($("total"), total - pts, total, 900);
+  $("pop").innerHTML = `<div class="stamp t-${g.key}" style="--r:${rand(-9, 9).toFixed(1)}deg"><small>${cityName}</small><strong>${g.label}</strong></div>`;
+  $("pop").hidden = false;
+  phase = "revealed"; busy = false; updateLegs();
+  $("go").textContent = round === ROUNDS - 1 ? "Open flight log" : "Next city";
+  $("go").disabled = false; $("go").focus({preventScroll: true});
+}
+
+// ---------- Final screen ----------
+const routeProj = d3.geoNaturalEarth1().fitExtent([[10, 10], [950, 470]], {type: "Sphere"}), routePath = d3.geoPath(routeProj);
+
+function showFinal() {
+  phase = "done"; $("pop").hidden = true; updateLegs();
+  const isBest = total > best;
+  if (isBest) { best = total; store.set("pin-best", best); }
+  const rank = RANKS.find(r => total >= r[0])[1];
+  $("fRank").textContent = rank;
+  $("fBest").textContent = isBest ? "New personal best" : best ? `Personal best ${fmt(best)}` : "";
+  $("fBest").classList.toggle("pb", isBest);
+  $("best").textContent = `Personal best ${fmt(best)}`;
+  $("shareText").hidden = true; $("copy").textContent = "Copy result";
+  $("stamps").innerHTML = results.map((r, i) =>
+    `<div class="stamp t-${r.g.key}" style="--r:${rand(-10, 10).toFixed(1)}deg;--d:${(.55 + i * .2).toFixed(2)}s">
+       <small>Leg ${i + 1}</small><strong>${r.name}</strong><small>${fmt(r.km)} km</small><small>+${fmt(r.pts)}</small></div>`).join("");
+  const l1 = `P<PINTHECITY<<${rank.toUpperCase().replace(/ /g, "<")}`, l2 = `${String(total).padStart(6, "0")}<${results.map(r => String(Math.round(r.km)).padStart(5, "0")).join("<")}`;
+  $("mrz").textContent = `${l1.padEnd(44, "<").slice(0, 44)}\n${l2.padEnd(44, "<").slice(0, 44)}`;
+  $("final").hidden = false;           // visible before drawing, so path lengths can be measured
+  drawRoutes();
+  countTo($("fTotal"), 0, total, 1600);
+  $("again").focus({preventScroll: true});
+  $("go").textContent = "Fly again";
+  if (isBest && !reduced) setTimeout(() => { for (let i = 0; i < 4; i++) confetti(W * (i + .5) / 4, -10, 50, 1, Math.PI / 2, 5); }, 900);
+}
+
+function drawRoutes() {
+  const r = d3.select("#routes"); r.selectAll("*").remove();
+  r.append("path").datum({type: "Sphere"}).attr("class", "r-sphere").attr("d", routePath);
+  r.append("path").datum(maps.lo.land).attr("class", "r-land").attr("d", routePath);
+  results.forEach((res, i) => {
+    const g = r.append("g").attr("class", `t-${res.g.key}`);
+    const arc = g.append("path").attr("class", "r-arc").attr("d", routePath({type: "LineString", coordinates: [res.guess, res.target]}) || "");
+    const len = arc.node().getTotalLength() || 0;
+    arc.style("stroke-dasharray", `${len} ${len}`).style("stroke-dashoffset", reduced ? 0 : len)
+       .style("transition", `stroke-dashoffset 1s ${.55 + i * .2}s ease-out`);
+    const [gx, gy] = routeProj(res.guess), [tx, ty] = routeProj(res.target);
+    g.append("circle").attr("class", "r-guess").attr("cx", gx).attr("cy", gy).attr("r", 4.5);
+    g.append("circle").attr("class", "r-target").attr("cx", tx).attr("cy", ty).attr("r", 6);
+    g.append("text").attr("x", tx).attr("y", ty - 12).attr("text-anchor", "middle").text(i + 1);
+  });
+  requestAnimationFrame(() => requestAnimationFrame(() => r.selectAll(".r-arc").style("stroke-dashoffset", 0)));
+}
+
+$("copy").onclick = () => {
+  const rank = RANKS.find(r => total >= r[0])[1];
+  const txt = `Pin the City ✈ ${fmt(total)} / ${fmt(MAX)}\n${results.map(r => r.g.emoji).join("")}\n${rank}`;
+  const ok = () => { $("copy").textContent = "Copied"; setTimeout(() => $("copy").textContent = "Copy result", 1600); };
+  const fail = () => { $("shareText").textContent = txt; $("shareText").hidden = false; $("copy").textContent = "Select the text below to copy"; };
+  try { navigator.clipboard.writeText(txt).then(ok, fail); } catch { fail(); }
+};
+$("again").onclick = start;
+$("go").onclick = () => {
+  if (phase === "guessing" && guess) reveal();
+  else if (phase === "revealed") { if (round < ROUNDS - 1) { round++; next(); } else showFinal(); }
+  else if (phase === "done") start();
+};
+
+// ---------- Input: drag to spin, pinch or wheel to zoom, tap to pin ----------
+const pointers = new Map(); let gesture = null;
+const pinchDist = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a[0] - b[0], a[1] - b[1]); };
+node.addEventListener("pointerdown", e => {
+  node.setPointerCapture(e.pointerId); pointers.set(e.pointerId, [e.clientX, e.clientY]); spinning = false;
+  gesture = pointers.size === 1 ? {type: "drag", x: e.clientX, y: e.clientY, rot: projection.rotate(), moved: false}
+                                : {type: "pinch", d: pinchDist(), z: zf};
+});
+node.addEventListener("pointermove", e => {
+  if (!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, [e.clientX, e.clientY]);
+  if (!gesture || busy) return;
+  if (gesture.type === "drag") {
+    const dx = e.clientX - gesture.x, dy = e.clientY - gesture.y;
+    if (!gesture.moved && Math.hypot(dx, dy) < 5) return;
+    gesture.moved = true; node.classList.add("grabbing");
+    const k = 60 / projection.scale();
+    projection.rotate([gesture.rot[0] + dx * k, Math.max(-80, Math.min(80, gesture.rot[1] - dy * k)), 0]); dirty = true;
+  } else if (gesture.type === "pinch" && pointers.size === 2) { zf = zGoal = clampZ(gesture.z * pinchDist() / gesture.d); dirty = true; }
+});
+function endPointer(e) {
+  const g = gesture; pointers.delete(e.pointerId); node.classList.remove("grabbing");
+  if (g && g.type === "drag" && !g.moved && e.type === "pointerup" && !busy) dropPin(e);
+  gesture = pointers.size ? {type: "done"} : null; // lifting one finger of a pinch shouldn't drop a pin
+}
+node.addEventListener("pointerup", endPointer);
+node.addEventListener("pointercancel", endPointer);
+node.addEventListener("wheel", e => {
+  e.preventDefault(); if (busy) return;
+  const dy = e.deltaY * (e.deltaMode === 1 ? 16 : 1); // some mice report lines, not pixels
+  spinning = false; zGoal = clampZ(zGoal * Math.exp(-dy * .002));
+}, {passive: false});
+const zoomBy = f => { if (busy) return; spinning = false; zGoal = clampZ(zGoal * f); };
+$("zin").onclick = () => zoomBy(1.6);
+$("zout").onclick = () => zoomBy(1 / 1.6);
+
+// ---------- Boot ----------
+layout(); requestAnimationFrame(frame);
+setFlaps("Pin the City");
+const getJSON = file => fetch(file).then(r => { if (!r.ok) throw new Error(`${file}: ${r.status}`); return r.json(); });
+Promise.all([getJSON("countries-110m.json"), getJSON("cities.json")])
+  .then(([topo, cities]) => {
+    TIERS = cities.tiers;
+    addMap("lo", topo);
+    getJSON("countries-hi.json").then(t => addMap("hi", t)).catch(() => {}); // sharper outlines, loaded in the background
+    setTimeout(start, reduced ? 0 : 900); // let the title settle on the board first
+  })
+  .catch(() => {
+    $("tier").textContent = "The map or city list didn't load";
+    $("hint").textContent = "Keep countries-110m.json and cities.json next to this page and open it through a local server, not by double-clicking.";
+  });
+</script>

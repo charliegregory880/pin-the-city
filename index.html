@@ -35,6 +35,7 @@ button{touch-action:manipulation}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 
 #stage,#stars,#earth,#globe,#fx{position:fixed;inset:0;width:100%;height:100%}
+#stage{touch-action:none}
 #globe{display:block;touch-action:none;cursor:grab}
 #globe.aim{cursor:crosshair}
 #globe.grabbing{cursor:grabbing}
@@ -45,6 +46,10 @@ button{touch-action:manipulation}
 .arc-glow{fill:none;stroke:var(--amber);stroke-opacity:.18;stroke-width:9;stroke-linecap:round}
 .arc{fill:none;stroke:var(--amber);stroke-width:2.2;stroke-linecap:round;stroke-dasharray:1 6}
 .pin .shadow{fill:#000}
+.pin .ring{fill:none;stroke-width:1.5;stroke-opacity:.85}
+.pin .spot{stroke:var(--night);stroke-width:1.5}
+.pin.guess .ring{stroke:var(--amber)} .pin.guess .spot{fill:var(--amber)}
+.pin.answer .ring{stroke:var(--teal)} .pin.answer .spot{fill:var(--teal)}
 .pin .body path{stroke:var(--night);stroke-width:1.5}
 .pin .dot{fill:var(--night)}
 .pin.guess .body path{fill:var(--amber)}
@@ -242,7 +247,6 @@ button{touch-action:manipulation}
 let TIERS = []; // five tiers of [name, country, lat, lng], loaded from cities.json
 const SCALE_KM = 1500;   // higher = more forgiving; 5000 * e^(-km / SCALE_KM)
 const ROUNDS = 5, MAX = 5000 * ROUNDS;
-const RECENT_LIMIT = 60; // cities to avoid repeating across games
 const GRADES = [         // ~125 km, ~410 km, ~1,040 km
   {min: 4600, key: "bull",  label: "Bullseye",    emoji: "🎯"},
   {min: 3800, key: "great", label: "Great guess", emoji: "🟩"},
@@ -261,7 +265,7 @@ const store = { // localStorage can be blocked, so never let it break the game
   get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
   set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
-let recent = store.get("pin-recent", []), best = store.get("pin-best", 0);
+let best = store.get("pin-best", 0);
 
 function countTo(el, from, to, dur = 800) {
   if (reduced) { el.textContent = fmt(to); return; }
@@ -282,6 +286,8 @@ const PLANE = "M0,-9 L2,-3 L9,1 L9,3 L2,1 L1.5,6 L4,8 L4,9.5 L0,8.5 L-4,9.5 L-4,
 function buildPin(cls) {
   const g = svg.append("g").attr("class", `pin ${cls}`).attr("display", "none");
   g.append("ellipse").attr("class", "shadow").attr("rx", 6).attr("ry", 2.2);
+  g.append("circle").attr("class", "ring").attr("r", 8);  // a target on the exact spot: the pin's head sits above it,
+  g.append("circle").attr("class", "spot").attr("r", 3);  // so a fingertip covering the tip can still see where it landed
   g.append("circle").attr("class", "halo").attr("r", 10);
   const body = g.append("g").attr("class", "body");
   body.append("path").attr("d", PIN);
@@ -301,7 +307,7 @@ const clampZ = z => Math.max(.85, Math.min(14, z));
 // Every animation is a step function in `anims`; the globe only redraws when something marked it dirty.
 const anims = new Set();
 const coarse = matchMedia("(pointer: coarse)").matches; // a touch screen
-let lite = false, slow = 0;
+let lite = false, slow = 0, redrewLast = false;
 let dirty = true, last = performance.now(), spinning = false;
 function animate(dur, step = () => {}, ease = d3.easeCubicInOut) {
   return new Promise(res => {
@@ -323,10 +329,11 @@ function frame(now) {
     zf += (zGoal - zf) * (reduced ? 1 : 1 - Math.exp(-dt / 110)); dirty = true;
   }
   if (dirty) {
-    const t0 = performance.now(); render(now); dirty = false;
-    // A device that keeps taking >12 ms per frame switches, once, to a lighter mode
-    if (!lite) { slow = performance.now() - t0 > 12 ? slow + 1 : Math.max(0, slow - 1); if (slow > 20) { lite = true; layout(true); } }
-  }
+    render(now); dirty = false;
+    // While the globe is moving, a device that keeps dropping below ~45 fps switches, once, to a lighter mode
+    if (!lite && redrewLast) { slow = dt > 22 ? slow + 1 : Math.max(0, slow - 1); if (slow > 15) { lite = true; layout(true); } }
+    redrewLast = true;
+  } else redrewLast = false;
   stepFx(dt);
   requestAnimationFrame(frame);
 }
@@ -352,7 +359,8 @@ const C = {ocean: css("--ocean"), oceanHi: css("--ocean-hi"), teal: css("--teal"
            edge: css("--land-edge"), grat: css("--grat"), land: [0, 1, 2, 3, 4].map(i => css(`--land-${i}`))};
 const GRAT = d3.geoGraticule10(), TAU = Math.PI * 2;
 
-// Two levels of detail chosen by zoom: 110m outlines zoomed out, simplified 50m (every island) from 3x in.
+// Two levels of detail chosen by zoom, both from Natural Earth 50m (see make_maps.mjs):
+// "lo" zoomed out (visible islands only), "hi" from 3x in (every island).
 // Shapes are stored as small pieces with a bounding circle, so pieces the camera can't see are skipped.
 const maps = {};
 let lod = "lo";
@@ -433,7 +441,9 @@ function countryAt(ll) {
   // Coastal cities can sit just outside the simplified outlines, so probe rings around them
   for (const r of [.25, .5, 1]) for (let i = 0; i < 8; i++) {
     const p = [ll[0] + r * Math.cos(i * Math.PI / 4), ll[1] + r * Math.sin(i * Math.PI / 4)];
-    const f = maps.lo.countries.find(f => d3.geoContains(f, p)); if (f) return f.properties.name;
+    for (const m of [maps.hi, maps.lo].filter(Boolean)) {
+      const f = m.countries.find(f => d3.geoContains(f, p)); if (f) return f.properties.name;
+    }
   }
   return null;
 }
@@ -524,8 +534,11 @@ function drawStars() {
 // ---------- Layout ----------
 let canvasKey = "";
 function layout(force) {
-  W = innerWidth; H = innerHeight; dpr = Math.min(2, devicePixelRatio || 1);
-  edpr = lite ? Math.min(dpr, 1.5) : dpr; // the globe can drop resolution if the device is struggling
+  // Measure the area the globe is really drawn in. In Safari innerHeight can disagree with it while the
+  // toolbars grow and shrink, which stretched the globe away from where taps landed.
+  const area = $("stage").getBoundingClientRect();
+  W = Math.round(area.width); H = Math.round(area.height); dpr = Math.min(2, devicePixelRatio || 1);
+  edpr = Math.min(dpr, lite ? 1.5 : 2); // full sharpness, dropping to 1.5x if the device is struggling
   const key = `${W}x${H}@${dpr}/${edpr}`;
   if (force || key !== canvasKey) { // resizing a canvas reallocates it, so only do it when the size really changed
     canvasKey = key;
@@ -544,7 +557,9 @@ function layout(force) {
   $("dock").style.left = `${wide ? cx : W / 2}px`;
   sizeFlaps(); dirty = true;
 }
-addEventListener("resize", layout);
+addEventListener("resize", () => layout());
+if (window.ResizeObserver) new ResizeObserver(() => layout()).observe($("stage")); // catches Safari's toolbar changes too
+window.visualViewport?.addEventListener("resize", () => layout());
 
 // ---------- Split-flap board ----------
 const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -581,14 +596,23 @@ function sizeFlaps() {
 let round = 0, total = 0, target, guess, guessAt = 0, targetAt = 0, targetShown = false;
 let phase = "loading", flight = null, busy = false, results = [], cityName = "", cityCountry = "";
 
-function pick(cities) { // prefer cities not seen recently
-  const key = c => `${c[0]}|${c[1]}`;
-  const fresh = cities.filter(c => !recent.includes(key(c)));
-  const pool = fresh.length ? fresh : cities;
-  const city = pool[Math.floor(Math.random() * pool.length)];
-  recent = [key(city), ...recent].slice(0, RECENT_LIMIT);
-  store.set("pin-recent", recent);
-  return city;
+// Each tier is a shuffled deck: every city in it comes up once before any city repeats.
+// Decks live in memory (so a session never repeats) and in browser storage when it's available (so games across visits don't either).
+const decks = {};
+function pick(tier) {
+  const cities = TIERS[tier].cities, key = `pin-deck-${tier}-${cities.length}`; // a rebuilt cities.json starts fresh decks
+  let deck = (decks[key] ?? store.get(key, null) ?? []).filter(i => i < cities.length);
+  const recent = (decks[`${key}-recent`] ?? store.get(`${key}-recent`, null) ?? []).filter(i => i < cities.length);
+  if (!deck.length) {
+    // Reshuffle, but put the last few cities you saw at the bottom, so none of them come straight back
+    const fresh = d3.range(cities.length).filter(i => !recent.includes(i));
+    deck = [...d3.shuffle(recent.slice()), ...d3.shuffle(fresh)]; // cards are dealt from the end
+  }
+  const i = deck.pop();
+  const seen = [i, ...recent].slice(0, Math.max(1, Math.floor(cities.length / 2))); // the last half of what you saw
+  decks[key] = deck; decks[`${key}-recent`] = seen;
+  store.set(key, deck); store.set(`${key}-recent`, seen);
+  return cities[i];
 }
 
 function updateLegs() {
@@ -609,7 +633,7 @@ function start() {
 }
 
 function next() {
-  const t = TIERS[round], [name, country, lat, lng] = pick(t.cities);
+  const t = TIERS[round], [name, country, lat, lng] = pick(round);
   cityName = name; cityCountry = country; picked = null; pickedName = null;
   target = [lng, lat]; guess = null; flight = null; targetShown = false; phase = "guessing";
   $("pop").hidden = true; $("readout").textContent = "";
@@ -627,7 +651,7 @@ function next() {
 
 function dropPin(e) {
   if (phase !== "guessing") return;
-  const x = e.clientX, y = e.clientY;
+  const area = $("stage").getBoundingClientRect(), x = e.clientX - area.left, y = e.clientY - area.top; // tap position on the globe's own area
   if (Math.hypot(x - cx, y - cy) > projection.scale()) return; // clicked off the globe
   const ll = projection.invert([x, y]);
   if (!ll || !isFinite(ll[0])) return;
@@ -729,14 +753,15 @@ $("go").onclick = () => {
 };
 
 // ---------- Input: drag to spin, pinch or wheel to zoom, tap to pin ----------
-const pointers = new Map(); let gesture = null;
+const pointers = new Map(), stage = $("stage"); let gesture = null;
 const pinchDist = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a[0] - b[0], a[1] - b[1]); };
-node.addEventListener("pointerdown", e => {
-  node.setPointerCapture(e.pointerId); pointers.set(e.pointerId, [e.clientX, e.clientY]); spinning = false;
+stage.addEventListener("pointerdown", e => {
+  try { stage.setPointerCapture(e.pointerId); } catch {} // keeps the drag even if the finger leaves the globe
+  pointers.set(e.pointerId, [e.clientX, e.clientY]); spinning = false;
   gesture = pointers.size === 1 ? {type: "drag", x: e.clientX, y: e.clientY, rot: projection.rotate(), moved: false}
                                 : {type: "pinch", d: pinchDist(), z: zf};
 });
-node.addEventListener("pointermove", e => {
+stage.addEventListener("pointermove", e => {
   if (!pointers.has(e.pointerId)) return;
   pointers.set(e.pointerId, [e.clientX, e.clientY]);
   if (!gesture || busy) return;
@@ -750,12 +775,13 @@ node.addEventListener("pointermove", e => {
 });
 function endPointer(e) {
   const g = gesture; pointers.delete(e.pointerId); node.classList.remove("grabbing");
-  if (g && g.type === "drag" && !g.moved && e.type === "pointerup" && !busy) dropPin(e);
+  // Drop where the finger first touched: fingers roll a little as they lift off
+  if (g && g.type === "drag" && !g.moved && e.type === "pointerup" && !busy) dropPin({clientX: g.x, clientY: g.y});
   gesture = pointers.size ? {type: "done"} : null; // lifting one finger of a pinch shouldn't drop a pin
 }
-node.addEventListener("pointerup", endPointer);
-node.addEventListener("pointercancel", endPointer);
-node.addEventListener("wheel", e => {
+stage.addEventListener("pointerup", endPointer);
+stage.addEventListener("pointercancel", endPointer);
+stage.addEventListener("wheel", e => {
   e.preventDefault(); if (busy) return;
   const dy = e.deltaY * (e.deltaMode === 1 ? 16 : 1); // some mice report lines, not pixels
   spinning = false; zGoal = clampZ(zGoal * Math.exp(-dy * .002));
@@ -766,12 +792,14 @@ $("zout").onclick = () => zoomBy(1 / 1.6);
 
 // Stop Safari zooming the whole page when a pinch starts off the globe
 for (const ev of ["gesturestart", "gesturechange"]) document.addEventListener(ev, e => e.preventDefault(), {passive: false});
+// iOS can still drag or rubber-band the whole page; block that everywhere except the scrollable flight log
+document.addEventListener("touchmove", e => { if (!e.target.closest(".final")) e.preventDefault(); }, {passive: false});
 
 // ---------- Boot ----------
 layout(); requestAnimationFrame(frame);
 setFlaps("Pin the City");
 const getJSON = file => fetch(file).then(r => { if (!r.ok) throw new Error(`${file}: ${r.status}`); return r.json(); });
-Promise.all([getJSON("countries-110m.json"), getJSON("cities.json")])
+Promise.all([getJSON("countries-mid.json"), getJSON("cities.json")])
   .then(([topo, cities]) => {
     TIERS = cities.tiers;
     addMap("lo", topo);
@@ -780,6 +808,6 @@ Promise.all([getJSON("countries-110m.json"), getJSON("cities.json")])
   })
   .catch(() => {
     $("tier").textContent = "The map or city list didn't load";
-    $("hint").textContent = "Keep countries-110m.json and cities.json next to this page and open it through a local server, not by double-clicking.";
+    $("hint").textContent = "Keep countries-mid.json and cities.json next to this page and open it through a local server, not by double-clicking.";
   });
 </script>

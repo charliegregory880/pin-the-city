@@ -1,6 +1,12 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07101d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pin the City">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Pin the City</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Instrument+Sans:wght@400;600&display=swap">
 <style>
@@ -21,8 +27,11 @@
   color-scheme:dark;
 }
 [hidden]{display:none!important}
-html,body{height:100%;margin:0}
-body{background:radial-gradient(ellipse at 55% 45%,var(--space),var(--night) 72%) fixed var(--night);color:var(--ink);font-family:var(--body);overflow:hidden}
+html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
+html{-webkit-text-size-adjust:100%;touch-action:manipulation} /* no double-tap zoom; the globe handles its own pinch */
+body{background:radial-gradient(ellipse at 55% 45%,var(--space),var(--night) 72%) var(--night);color:var(--ink);font-family:var(--body);
+  -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+button{touch-action:manipulation}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 
 #stage,#stars,#earth,#globe,#fx{position:fixed;inset:0;width:100%;height:100%}
@@ -82,7 +91,8 @@ body{background:radial-gradient(ellipse at 55% 45%,var(--space),var(--night) 72%
 .readout .pts{color:var(--amber);animation:rise .4s ease-out both}
 .go{width:100%;padding:14px 20px;border:0;border-radius:999px;background:var(--amber);color:var(--on-amber);font:600 1.05rem var(--body);cursor:pointer;
   box-shadow:0 10px 34px -10px rgba(255,178,63,.75);transition:transform .15s,box-shadow .15s}
-.go:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 14px 40px -10px rgba(255,178,63,.9)}
+@media (hover:hover){.go:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 14px 40px -10px rgba(255,178,63,.9)}} /* no sticky hover after a tap */
+.go:active:not(:disabled){transform:scale(.98)}
 .go:disabled{background:#223247;color:var(--muted);box-shadow:none;cursor:not-allowed}
 .go:focus-visible,.zoom button:focus-visible,.pp-actions button:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
 .hint{margin:0;font-size:.8rem;color:var(--muted);min-height:1.2em}
@@ -104,8 +114,8 @@ body{background:radial-gradient(ellipse at 55% 45%,var(--space),var(--night) 72%
 
 /* Final: passport flight log */
 .final{position:fixed;inset:0;z-index:10;overflow:auto;background:rgba(3,8,15,.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-  display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
-.passport{width:min(780px,100%);box-sizing:border-box;padding:clamp(18px,4vw,34px);border-radius:16px;color:var(--paper-ink);display:grid;gap:20px;
+  display:flex;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.passport{margin:auto;width:min(780px,100%);box-sizing:border-box;padding:clamp(18px,4vw,34px);border-radius:16px;color:var(--paper-ink);display:grid;gap:20px;
   background:repeating-radial-gradient(circle at 0 0,transparent 0 13px,rgba(27,50,69,.05) 13px 14px),repeating-radial-gradient(circle at 100% 100%,transparent 0 17px,rgba(13,117,96,.05) 17px 18px),var(--paper);
   box-shadow:0 40px 90px -24px #000;animation:open .7s cubic-bezier(.2,.9,.3,1) both}
 @keyframes open{from{opacity:0;transform:translateY(40px) rotateX(18deg) scale(.96)}}
@@ -133,9 +143,44 @@ body{background:radial-gradient(ellipse at 55% 45%,var(--space),var(--night) 72%
 #again{border:0;background:var(--paper-ink);color:var(--paper)}
 #copy{border:2px solid var(--paper-ink);background:transparent;color:var(--paper-ink)}
 .pp-credit{margin:0;font-size:.75rem;opacity:.6}
-#shareText{margin:0;padding:10px;border-radius:8px;background:rgba(27,50,69,.08);font:500 .9rem/1.5 var(--mono);white-space:pre-wrap;user-select:all}
+#shareText{margin:0;padding:10px;border-radius:8px;background:rgba(27,50,69,.08);font:500 .9rem/1.5 var(--mono);white-space:pre-wrap;-webkit-user-select:all;user-select:all}
 
 @media (max-width:899px){ .zoom{top:auto;transform:none;bottom:calc(150px + env(safe-area-inset-bottom,0px))} }
+
+/* Touch screens: pinch replaces the zoom buttons, and the effects iOS Safari finds expensive are swapped for cheap ones */
+@media (pointer:coarse){
+  .zoom{display:none}
+  .board{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(9,19,33,.93)}
+  .final{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(3,8,15,.9)}
+  .stamp{filter:none}
+}
+/* Phones in portrait: a tighter board so the globe gets the space */
+@media (max-width:600px){
+  .board{top:calc(10px + env(safe-area-inset-top,0px));left:max(12px,env(safe-area-inset-left,0px));width:calc(100% - 24px);padding:12px 12px 10px;border-radius:12px}
+  .total{font-size:1.5rem}
+  .tier{margin:8px 0 6px}
+  .country{margin-top:6px}
+  .legs{margin-top:10px;gap:5px}
+  .legs li{height:5px}
+  .best{display:none}
+  .dock{bottom:calc(12px + env(safe-area-inset-bottom,0px));width:calc(100% - 24px);gap:8px}
+  .readout{font-size:1.8rem;min-height:2.1rem}
+  .go{padding:14px 20px;font-size:1.05rem}
+  .hint{font-size:.75rem}
+  .pop{scale:.85;margin-bottom:8px}
+  .stamps{gap:10px 8px}
+  .stamp{width:116px}
+  .stamp.t-bull{width:120px}
+}
+/* Phones in landscape: board on the left, globe on the right */
+@media (max-height:520px) and (orientation:landscape){
+  .board{width:min(300px,40%);top:calc(10px + env(safe-area-inset-top,0px));padding:10px 12px}
+  .best,.hint{display:none}
+  .readout{font-size:1.6rem;min-height:1.9rem}
+  .go{padding:11px 18px}
+  .dock{width:min(320px,45%);bottom:calc(10px + env(safe-area-inset-bottom,0px));gap:6px}
+  .pop{scale:.75;margin-bottom:6px}
+}
 @media (prefers-reduced-motion:reduce){*,*::before{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
 
@@ -249,12 +294,14 @@ plane.append("path").attr("d", PLANE);
 
 const projection = d3.geoOrthographic().clipAngle(90).precision(0).rotate([-10, -20, 0]);
 const path = d3.geoPath(projection);
-let W, H, dpr, cx, cy, base, availW, availH, zf = 1, zGoal = 1; // zf eases towards zGoal each frame
+let W, H, dpr, edpr, cx, cy, base, availW, availH, zf = 1, zGoal = 1; // zf eases towards zGoal each frame
 const clampZ = z => Math.max(.85, Math.min(14, z));
 
 // ---------- Animation loop ----------
 // Every animation is a step function in `anims`; the globe only redraws when something marked it dirty.
 const anims = new Set();
+const coarse = matchMedia("(pointer: coarse)").matches; // a touch screen
+let lite = false, slow = 0;
 let dirty = true, last = performance.now(), spinning = false;
 function animate(dur, step = () => {}, ease = d3.easeCubicInOut) {
   return new Promise(res => {
@@ -275,7 +322,11 @@ function frame(now) {
   if (!busy && Math.abs(zGoal - zf) > 1e-4) { // smooth zoom: close ~15% of the gap per frame, whatever the frame rate
     zf += (zGoal - zf) * (reduced ? 1 : 1 - Math.exp(-dt / 110)); dirty = true;
   }
-  if (dirty) { render(now); dirty = false; }
+  if (dirty) {
+    const t0 = performance.now(); render(now); dirty = false;
+    // A device that keeps taking >12 ms per frame switches, once, to a lighter mode
+    if (!lite) { slow = performance.now() - t0 > 12 ? slow + 1 : Math.max(0, slow - 1); if (slow > 20) { lite = true; layout(true); } }
+  }
   stepFx(dt);
   requestAnimationFrame(frame);
 }
@@ -334,7 +385,7 @@ function visible(pieces, ctr, view) { // one canvas path of only the pieces in v
 
 function drawEarth(now) {
   const R = projection.scale();
-  ec.setTransform(dpr, 0, 0, dpr, 0, 0); ec.clearRect(0, 0, W, H);
+  ec.setTransform(edpr, 0, 0, edpr, 0, 0); ec.clearRect(0, 0, W, H);
   const disc = () => { ec.beginPath(); ec.arc(cx, cy, R, 0, TAU); };
   let g = ec.createRadialGradient(cx, cy, R, cx, cy, R * 1.18);        // atmosphere
   g.addColorStop(0, rgba(C.teal, .22)); g.addColorStop(1, rgba(C.teal, 0));
@@ -352,9 +403,11 @@ function drawEarth(now) {
     const view = reach < R ? Math.asin(reach / R) + .02 : Math.PI / 2, ctr = centre();
     const coast = visible(m.coast, ctr, view);
     ec.lineJoin = "round";
-    ec.strokeStyle = rgba(C.teal, .09); ec.lineWidth = 7; ec.stroke(coast);   // coastal glow
+    if (!lite) { ec.strokeStyle = rgba(C.teal, .09); ec.lineWidth = 7; ec.stroke(coast); } // coastal glow
     m.fills.forEach((pieces, t) => { ec.fillStyle = C.land[t]; ec.fill(visible(pieces, ctr, view)); });
-    ec.setLineDash([2.5, 2]); ec.strokeStyle = rgba(C.edge, .5); ec.lineWidth = .6; ec.stroke(visible(m.borders, ctr, view)); ec.setLineDash([]);
+    const dashed = !coarse && !lite; // dashed canvas lines are slow in Safari, so touch screens get solid ones
+    if (dashed) ec.setLineDash([2.5, 2]);
+    ec.strokeStyle = rgba(C.edge, dashed ? .5 : .35); ec.lineWidth = .6; ec.stroke(visible(m.borders, ctr, view)); ec.setLineDash([]);
     ec.strokeStyle = rgba(C.coast, .8); ec.lineWidth = .9; ec.stroke(coast);
     const shape = pickedName && pickedShape(lod);
     if (shape) { // flare up, then settle to a soft highlight
@@ -453,8 +506,9 @@ function shake() { const s = $("stage"); s.classList.remove("shake"); void s.off
 function celebrate(g) {
   if (reduced) return;
   const [x, y] = projection(target), c = getComputedStyle(document.documentElement).getPropertyValue(`--c-${g.key}`).trim();
-  if (g.key === "bull")  { shockwaves(x, y, 3, c); confetti(x, y, 160, Math.PI * 2, 0, 9); shake(); }
-  if (g.key === "great") { shockwaves(x, y, 2, c); confetti(x, y, 70, Math.PI * 2, 0, 6); }
+  const k = coarse || lite ? .6 : 1;
+  if (g.key === "bull")  { shockwaves(x, y, 3, c); confetti(x, y, 160 * k, Math.PI * 2, 0, 9); shake(); }
+  if (g.key === "great") { shockwaves(x, y, 2, c); confetti(x, y, 70 * k, Math.PI * 2, 0, 6); }
   if (g.key === "good")  { shockwaves(x, y, 1, c); confetti(x, y, 18, Math.PI * 2, 0, 4); }
 }
 
@@ -468,14 +522,22 @@ function drawStars() {
 }
 
 // ---------- Layout ----------
-function layout() {
+let canvasKey = "";
+function layout(force) {
   W = innerWidth; H = innerHeight; dpr = Math.min(2, devicePixelRatio || 1);
-  svg.attr("width", W).attr("height", H);
-  for (const c of [fx, stars, earth]) { c.width = W * dpr; c.height = H * dpr; }
-  projection.clipExtent([[-20, -20], [W + 20, H + 20]]); // skip drawing what's off screen when zoomed in
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); drawStars();
-  const b = $("board").getBoundingClientRect(), wide = W >= 900;
-  const left = wide ? b.right : 0, top = wide ? 0 : b.bottom, bottom = H - (wide ? 150 : 165);
+  edpr = lite ? Math.min(dpr, 1.5) : dpr; // the globe can drop resolution if the device is struggling
+  const key = `${W}x${H}@${dpr}/${edpr}`;
+  if (force || key !== canvasKey) { // resizing a canvas reallocates it, so only do it when the size really changed
+    canvasKey = key;
+    svg.attr("width", W).attr("height", H);
+    for (const c of [fx, stars]) { c.width = W * dpr; c.height = H * dpr; }
+    earth.width = W * edpr; earth.height = H * edpr;
+    projection.clipExtent([[-20, -20], [W + 20, H + 20]]); // skip drawing what's off screen when zoomed in
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); drawStars();
+  }
+  const b = $("board").getBoundingClientRect(), d = $("dock").getBoundingClientRect();
+  const wide = W >= 900 || (W > H && H <= 520); // desktops, and phones held sideways
+  const left = wide ? b.right + 8 : 0, top = wide ? 0 : b.bottom + 6, bottom = d.top - 8;
   availW = W - left; availH = bottom - top;
   cx = (left + W) / 2; cy = (top + bottom) / 2;
   base = Math.max(70, Math.min(availW, availH) / 2 * .9);
@@ -512,7 +574,7 @@ function sizeFlaps() {
   const el = $("flaps"), words = [...el.children];
   if (!words.length) return;
   const longest = Math.max(...words.map(w => w.children.length));
-  el.style.setProperty("--fs", `${Math.min(44, Math.floor(el.clientWidth / (longest * .86 + .2)))}px`);
+  el.style.setProperty("--fs", `${Math.min(W < 600 ? 34 : 44, Math.floor(el.clientWidth / (longest * .86 + .2)))}px`);
 }
 
 // ---------- Game state ----------
@@ -680,7 +742,7 @@ node.addEventListener("pointermove", e => {
   if (!gesture || busy) return;
   if (gesture.type === "drag") {
     const dx = e.clientX - gesture.x, dy = e.clientY - gesture.y;
-    if (!gesture.moved && Math.hypot(dx, dy) < 5) return;
+    if (!gesture.moved && Math.hypot(dx, dy) < (e.pointerType === "touch" ? 9 : 5)) return; // fingers wobble more than mice
     gesture.moved = true; node.classList.add("grabbing");
     const k = 60 / projection.scale();
     projection.rotate([gesture.rot[0] + dx * k, Math.max(-80, Math.min(80, gesture.rot[1] - dy * k)), 0]); dirty = true;
@@ -701,6 +763,9 @@ node.addEventListener("wheel", e => {
 const zoomBy = f => { if (busy) return; spinning = false; zGoal = clampZ(zGoal * f); };
 $("zin").onclick = () => zoomBy(1.6);
 $("zout").onclick = () => zoomBy(1 / 1.6);
+
+// Stop Safari zooming the whole page when a pinch starts off the globe
+for (const ev of ["gesturestart", "gesturechange"]) document.addEventListener(ev, e => e.preventDefault(), {passive: false});
 
 // ---------- Boot ----------
 layout(); requestAnimationFrame(frame);

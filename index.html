@@ -1,6 +1,12 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07101d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pin the City">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Pin the City</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Instrument+Sans:wght@400;600&display=swap">
 <style>
@@ -21,11 +27,15 @@
   color-scheme:dark;
 }
 [hidden]{display:none!important}
-html,body{height:100%;margin:0}
-body{background:radial-gradient(ellipse at 55% 45%,var(--space),var(--night) 72%) fixed var(--night);color:var(--ink);font-family:var(--body);overflow:hidden}
+html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
+html{-webkit-text-size-adjust:100%;touch-action:manipulation} /* no double-tap zoom; the globe handles its own pinch */
+body{background:radial-gradient(ellipse at 55% 45%,var(--space),var(--night) 72%) var(--night);color:var(--ink);font-family:var(--body);
+  -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+button{touch-action:manipulation}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 
 #stage,#stars,#earth,#globe,#fx{position:fixed;inset:0;width:100%;height:100%}
+#stage{touch-action:none}
 #globe{display:block;touch-action:none;cursor:grab}
 #globe.aim{cursor:crosshair}
 #globe.grabbing{cursor:grabbing}
@@ -36,6 +46,10 @@ body{background:radial-gradient(ellipse at 55% 45%,var(--space),var(--night) 72%
 .arc-glow{fill:none;stroke:var(--amber);stroke-opacity:.18;stroke-width:9;stroke-linecap:round}
 .arc{fill:none;stroke:var(--amber);stroke-width:2.2;stroke-linecap:round;stroke-dasharray:1 6}
 .pin .shadow{fill:#000}
+.pin .ring{fill:none;stroke-width:1.5;stroke-opacity:.85}
+.pin .spot{stroke:var(--night);stroke-width:1.5}
+.pin.guess .ring{stroke:var(--amber)} .pin.guess .spot{fill:var(--amber)}
+.pin.answer .ring{stroke:var(--teal)} .pin.answer .spot{fill:var(--teal)}
 .pin .body path{stroke:var(--night);stroke-width:1.5}
 .pin .dot{fill:var(--night)}
 .pin.guess .body path{fill:var(--amber)}
@@ -82,7 +96,8 @@ body{background:radial-gradient(ellipse at 55% 45%,var(--space),var(--night) 72%
 .readout .pts{color:var(--amber);animation:rise .4s ease-out both}
 .go{width:100%;padding:14px 20px;border:0;border-radius:999px;background:var(--amber);color:var(--on-amber);font:600 1.05rem var(--body);cursor:pointer;
   box-shadow:0 10px 34px -10px rgba(255,178,63,.75);transition:transform .15s,box-shadow .15s}
-.go:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 14px 40px -10px rgba(255,178,63,.9)}
+@media (hover:hover){.go:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 14px 40px -10px rgba(255,178,63,.9)}} /* no sticky hover after a tap */
+.go:active:not(:disabled){transform:scale(.98)}
 .go:disabled{background:#223247;color:var(--muted);box-shadow:none;cursor:not-allowed}
 .go:focus-visible,.zoom button:focus-visible,.pp-actions button:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
 .hint{margin:0;font-size:.8rem;color:var(--muted);min-height:1.2em}
@@ -104,8 +119,8 @@ body{background:radial-gradient(ellipse at 55% 45%,var(--space),var(--night) 72%
 
 /* Final: passport flight log */
 .final{position:fixed;inset:0;z-index:10;overflow:auto;background:rgba(3,8,15,.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-  display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
-.passport{width:min(780px,100%);box-sizing:border-box;padding:clamp(18px,4vw,34px);border-radius:16px;color:var(--paper-ink);display:grid;gap:20px;
+  display:flex;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.passport{margin:auto;width:min(780px,100%);box-sizing:border-box;padding:clamp(18px,4vw,34px);border-radius:16px;color:var(--paper-ink);display:grid;gap:20px;
   background:repeating-radial-gradient(circle at 0 0,transparent 0 13px,rgba(27,50,69,.05) 13px 14px),repeating-radial-gradient(circle at 100% 100%,transparent 0 17px,rgba(13,117,96,.05) 17px 18px),var(--paper);
   box-shadow:0 40px 90px -24px #000;animation:open .7s cubic-bezier(.2,.9,.3,1) both}
 @keyframes open{from{opacity:0;transform:translateY(40px) rotateX(18deg) scale(.96)}}
@@ -133,9 +148,44 @@ body{background:radial-gradient(ellipse at 55% 45%,var(--space),var(--night) 72%
 #again{border:0;background:var(--paper-ink);color:var(--paper)}
 #copy{border:2px solid var(--paper-ink);background:transparent;color:var(--paper-ink)}
 .pp-credit{margin:0;font-size:.75rem;opacity:.6}
-#shareText{margin:0;padding:10px;border-radius:8px;background:rgba(27,50,69,.08);font:500 .9rem/1.5 var(--mono);white-space:pre-wrap;user-select:all}
+#shareText{margin:0;padding:10px;border-radius:8px;background:rgba(27,50,69,.08);font:500 .9rem/1.5 var(--mono);white-space:pre-wrap;-webkit-user-select:all;user-select:all}
 
 @media (max-width:899px){ .zoom{top:auto;transform:none;bottom:calc(150px + env(safe-area-inset-bottom,0px))} }
+
+/* Touch screens: pinch replaces the zoom buttons, and the effects iOS Safari finds expensive are swapped for cheap ones */
+@media (pointer:coarse){
+  .zoom{display:none}
+  .board{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(9,19,33,.93)}
+  .final{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(3,8,15,.9)}
+  .stamp{filter:none}
+}
+/* Phones in portrait: a tighter board so the globe gets the space */
+@media (max-width:600px){
+  .board{top:calc(10px + env(safe-area-inset-top,0px));left:max(12px,env(safe-area-inset-left,0px));width:calc(100% - 24px);padding:12px 12px 10px;border-radius:12px}
+  .total{font-size:1.5rem}
+  .tier{margin:8px 0 6px}
+  .country{margin-top:6px}
+  .legs{margin-top:10px;gap:5px}
+  .legs li{height:5px}
+  .best{display:none}
+  .dock{bottom:calc(12px + env(safe-area-inset-bottom,0px));width:calc(100% - 24px);gap:8px}
+  .readout{font-size:1.8rem;min-height:2.1rem}
+  .go{padding:14px 20px;font-size:1.05rem}
+  .hint{font-size:.75rem}
+  .pop{scale:.85;margin-bottom:8px}
+  .stamps{gap:10px 8px}
+  .stamp{width:116px}
+  .stamp.t-bull{width:120px}
+}
+/* Phones in landscape: board on the left, globe on the right */
+@media (max-height:520px) and (orientation:landscape){
+  .board{width:min(300px,40%);top:calc(10px + env(safe-area-inset-top,0px));padding:10px 12px}
+  .best,.hint{display:none}
+  .readout{font-size:1.6rem;min-height:1.9rem}
+  .go{padding:11px 18px}
+  .dock{width:min(320px,45%);bottom:calc(10px + env(safe-area-inset-bottom,0px));gap:6px}
+  .pop{scale:.75;margin-bottom:6px}
+}
 @media (prefers-reduced-motion:reduce){*,*::before{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
 
@@ -197,7 +247,6 @@ body{background:radial-gradient(ellipse at 55% 45%,var(--space),var(--night) 72%
 let TIERS = []; // five tiers of [name, country, lat, lng], loaded from cities.json
 const SCALE_KM = 1500;   // higher = more forgiving; 5000 * e^(-km / SCALE_KM)
 const ROUNDS = 5, MAX = 5000 * ROUNDS;
-const RECENT_LIMIT = 60; // cities to avoid repeating across games
 const GRADES = [         // ~125 km, ~410 km, ~1,040 km
   {min: 4600, key: "bull",  label: "Bullseye",    emoji: "🎯"},
   {min: 3800, key: "great", label: "Great guess", emoji: "🟩"},
@@ -216,7 +265,7 @@ const store = { // localStorage can be blocked, so never let it break the game
   get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
   set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
-let recent = store.get("pin-recent", []), best = store.get("pin-best", 0);
+let best = store.get("pin-best", 0);
 
 function countTo(el, from, to, dur = 800) {
   if (reduced) { el.textContent = fmt(to); return; }
@@ -237,6 +286,8 @@ const PLANE = "M0,-9 L2,-3 L9,1 L9,3 L2,1 L1.5,6 L4,8 L4,9.5 L0,8.5 L-4,9.5 L-4,
 function buildPin(cls) {
   const g = svg.append("g").attr("class", `pin ${cls}`).attr("display", "none");
   g.append("ellipse").attr("class", "shadow").attr("rx", 6).attr("ry", 2.2);
+  g.append("circle").attr("class", "ring").attr("r", 8);  // a target on the exact spot: the pin's head sits above it,
+  g.append("circle").attr("class", "spot").attr("r", 3);  // so a fingertip covering the tip can still see where it landed
   g.append("circle").attr("class", "halo").attr("r", 10);
   const body = g.append("g").attr("class", "body");
   body.append("path").attr("d", PIN);
@@ -249,12 +300,14 @@ plane.append("path").attr("d", PLANE);
 
 const projection = d3.geoOrthographic().clipAngle(90).precision(0).rotate([-10, -20, 0]);
 const path = d3.geoPath(projection);
-let W, H, dpr, cx, cy, base, availW, availH, zf = 1, zGoal = 1; // zf eases towards zGoal each frame
+let W, H, dpr, edpr, cx, cy, base, availW, availH, zf = 1, zGoal = 1; // zf eases towards zGoal each frame
 const clampZ = z => Math.max(.85, Math.min(14, z));
 
 // ---------- Animation loop ----------
 // Every animation is a step function in `anims`; the globe only redraws when something marked it dirty.
 const anims = new Set();
+const coarse = matchMedia("(pointer: coarse)").matches; // a touch screen
+let lite = false, slow = 0, redrewLast = false;
 let dirty = true, last = performance.now(), spinning = false;
 function animate(dur, step = () => {}, ease = d3.easeCubicInOut) {
   return new Promise(res => {
@@ -275,7 +328,12 @@ function frame(now) {
   if (!busy && Math.abs(zGoal - zf) > 1e-4) { // smooth zoom: close ~15% of the gap per frame, whatever the frame rate
     zf += (zGoal - zf) * (reduced ? 1 : 1 - Math.exp(-dt / 110)); dirty = true;
   }
-  if (dirty) { render(now); dirty = false; }
+  if (dirty) {
+    render(now); dirty = false;
+    // While the globe is moving, a device that keeps dropping below ~45 fps switches, once, to a lighter mode
+    if (!lite && redrewLast) { slow = dt > 22 ? slow + 1 : Math.max(0, slow - 1); if (slow > 15) { lite = true; layout(true); } }
+    redrewLast = true;
+  } else redrewLast = false;
   stepFx(dt);
   requestAnimationFrame(frame);
 }
@@ -301,7 +359,8 @@ const C = {ocean: css("--ocean"), oceanHi: css("--ocean-hi"), teal: css("--teal"
            edge: css("--land-edge"), grat: css("--grat"), land: [0, 1, 2, 3, 4].map(i => css(`--land-${i}`))};
 const GRAT = d3.geoGraticule10(), TAU = Math.PI * 2;
 
-// Two levels of detail chosen by zoom: 110m outlines zoomed out, simplified 50m (every island) from 3x in.
+// Two levels of detail chosen by zoom, both from Natural Earth 50m (see make_maps.mjs):
+// "lo" zoomed out (visible islands only), "hi" from 3x in (every island).
 // Shapes are stored as small pieces with a bounding circle, so pieces the camera can't see are skipped.
 const maps = {};
 let lod = "lo";
@@ -334,7 +393,7 @@ function visible(pieces, ctr, view) { // one canvas path of only the pieces in v
 
 function drawEarth(now) {
   const R = projection.scale();
-  ec.setTransform(dpr, 0, 0, dpr, 0, 0); ec.clearRect(0, 0, W, H);
+  ec.setTransform(edpr, 0, 0, edpr, 0, 0); ec.clearRect(0, 0, W, H);
   const disc = () => { ec.beginPath(); ec.arc(cx, cy, R, 0, TAU); };
   let g = ec.createRadialGradient(cx, cy, R, cx, cy, R * 1.18);        // atmosphere
   g.addColorStop(0, rgba(C.teal, .22)); g.addColorStop(1, rgba(C.teal, 0));
@@ -352,9 +411,11 @@ function drawEarth(now) {
     const view = reach < R ? Math.asin(reach / R) + .02 : Math.PI / 2, ctr = centre();
     const coast = visible(m.coast, ctr, view);
     ec.lineJoin = "round";
-    ec.strokeStyle = rgba(C.teal, .09); ec.lineWidth = 7; ec.stroke(coast);   // coastal glow
+    if (!lite) { ec.strokeStyle = rgba(C.teal, .09); ec.lineWidth = 7; ec.stroke(coast); } // coastal glow
     m.fills.forEach((pieces, t) => { ec.fillStyle = C.land[t]; ec.fill(visible(pieces, ctr, view)); });
-    ec.setLineDash([2.5, 2]); ec.strokeStyle = rgba(C.edge, .5); ec.lineWidth = .6; ec.stroke(visible(m.borders, ctr, view)); ec.setLineDash([]);
+    const dashed = !coarse && !lite; // dashed canvas lines are slow in Safari, so touch screens get solid ones
+    if (dashed) ec.setLineDash([2.5, 2]);
+    ec.strokeStyle = rgba(C.edge, dashed ? .5 : .35); ec.lineWidth = .6; ec.stroke(visible(m.borders, ctr, view)); ec.setLineDash([]);
     ec.strokeStyle = rgba(C.coast, .8); ec.lineWidth = .9; ec.stroke(coast);
     const shape = pickedName && pickedShape(lod);
     if (shape) { // flare up, then settle to a soft highlight
@@ -380,7 +441,9 @@ function countryAt(ll) {
   // Coastal cities can sit just outside the simplified outlines, so probe rings around them
   for (const r of [.25, .5, 1]) for (let i = 0; i < 8; i++) {
     const p = [ll[0] + r * Math.cos(i * Math.PI / 4), ll[1] + r * Math.sin(i * Math.PI / 4)];
-    const f = maps.lo.countries.find(f => d3.geoContains(f, p)); if (f) return f.properties.name;
+    for (const m of [maps.hi, maps.lo].filter(Boolean)) {
+      const f = m.countries.find(f => d3.geoContains(f, p)); if (f) return f.properties.name;
+    }
   }
   return null;
 }
@@ -453,8 +516,9 @@ function shake() { const s = $("stage"); s.classList.remove("shake"); void s.off
 function celebrate(g) {
   if (reduced) return;
   const [x, y] = projection(target), c = getComputedStyle(document.documentElement).getPropertyValue(`--c-${g.key}`).trim();
-  if (g.key === "bull")  { shockwaves(x, y, 3, c); confetti(x, y, 160, Math.PI * 2, 0, 9); shake(); }
-  if (g.key === "great") { shockwaves(x, y, 2, c); confetti(x, y, 70, Math.PI * 2, 0, 6); }
+  const k = coarse || lite ? .6 : 1;
+  if (g.key === "bull")  { shockwaves(x, y, 3, c); confetti(x, y, 160 * k, Math.PI * 2, 0, 9); shake(); }
+  if (g.key === "great") { shockwaves(x, y, 2, c); confetti(x, y, 70 * k, Math.PI * 2, 0, 6); }
   if (g.key === "good")  { shockwaves(x, y, 1, c); confetti(x, y, 18, Math.PI * 2, 0, 4); }
 }
 
@@ -468,21 +532,34 @@ function drawStars() {
 }
 
 // ---------- Layout ----------
-function layout() {
-  W = innerWidth; H = innerHeight; dpr = Math.min(2, devicePixelRatio || 1);
-  svg.attr("width", W).attr("height", H);
-  for (const c of [fx, stars, earth]) { c.width = W * dpr; c.height = H * dpr; }
-  projection.clipExtent([[-20, -20], [W + 20, H + 20]]); // skip drawing what's off screen when zoomed in
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); drawStars();
-  const b = $("board").getBoundingClientRect(), wide = W >= 900;
-  const left = wide ? b.right : 0, top = wide ? 0 : b.bottom, bottom = H - (wide ? 150 : 165);
+let canvasKey = "";
+function layout(force) {
+  // Measure the area the globe is really drawn in. In Safari innerHeight can disagree with it while the
+  // toolbars grow and shrink, which stretched the globe away from where taps landed.
+  const area = $("stage").getBoundingClientRect();
+  W = Math.round(area.width); H = Math.round(area.height); dpr = Math.min(2, devicePixelRatio || 1);
+  edpr = Math.min(dpr, lite ? 1.5 : 2); // full sharpness, dropping to 1.5x if the device is struggling
+  const key = `${W}x${H}@${dpr}/${edpr}`;
+  if (force || key !== canvasKey) { // resizing a canvas reallocates it, so only do it when the size really changed
+    canvasKey = key;
+    svg.attr("width", W).attr("height", H);
+    for (const c of [fx, stars]) { c.width = W * dpr; c.height = H * dpr; }
+    earth.width = W * edpr; earth.height = H * edpr;
+    projection.clipExtent([[-20, -20], [W + 20, H + 20]]); // skip drawing what's off screen when zoomed in
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); drawStars();
+  }
+  const b = $("board").getBoundingClientRect(), d = $("dock").getBoundingClientRect();
+  const wide = W >= 900 || (W > H && H <= 520); // desktops, and phones held sideways
+  const left = wide ? b.right + 8 : 0, top = wide ? 0 : b.bottom + 6, bottom = d.top - 8;
   availW = W - left; availH = bottom - top;
   cx = (left + W) / 2; cy = (top + bottom) / 2;
   base = Math.max(70, Math.min(availW, availH) / 2 * .9);
   $("dock").style.left = `${wide ? cx : W / 2}px`;
   sizeFlaps(); dirty = true;
 }
-addEventListener("resize", layout);
+addEventListener("resize", () => layout());
+if (window.ResizeObserver) new ResizeObserver(() => layout()).observe($("stage")); // catches Safari's toolbar changes too
+window.visualViewport?.addEventListener("resize", () => layout());
 
 // ---------- Split-flap board ----------
 const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -512,21 +589,30 @@ function sizeFlaps() {
   const el = $("flaps"), words = [...el.children];
   if (!words.length) return;
   const longest = Math.max(...words.map(w => w.children.length));
-  el.style.setProperty("--fs", `${Math.min(44, Math.floor(el.clientWidth / (longest * .86 + .2)))}px`);
+  el.style.setProperty("--fs", `${Math.min(W < 600 ? 34 : 44, Math.floor(el.clientWidth / (longest * .86 + .2)))}px`);
 }
 
 // ---------- Game state ----------
 let round = 0, total = 0, target, guess, guessAt = 0, targetAt = 0, targetShown = false;
 let phase = "loading", flight = null, busy = false, results = [], cityName = "", cityCountry = "";
 
-function pick(cities) { // prefer cities not seen recently
-  const key = c => `${c[0]}|${c[1]}`;
-  const fresh = cities.filter(c => !recent.includes(key(c)));
-  const pool = fresh.length ? fresh : cities;
-  const city = pool[Math.floor(Math.random() * pool.length)];
-  recent = [key(city), ...recent].slice(0, RECENT_LIMIT);
-  store.set("pin-recent", recent);
-  return city;
+// Each tier is a shuffled deck: every city in it comes up once before any city repeats.
+// Decks live in memory (so a session never repeats) and in browser storage when it's available (so games across visits don't either).
+const decks = {};
+function pick(tier) {
+  const cities = TIERS[tier].cities, key = `pin-deck-${tier}-${cities.length}`; // a rebuilt cities.json starts fresh decks
+  let deck = (decks[key] ?? store.get(key, null) ?? []).filter(i => i < cities.length);
+  const recent = (decks[`${key}-recent`] ?? store.get(`${key}-recent`, null) ?? []).filter(i => i < cities.length);
+  if (!deck.length) {
+    // Reshuffle, but put the last few cities you saw at the bottom, so none of them come straight back
+    const fresh = d3.range(cities.length).filter(i => !recent.includes(i));
+    deck = [...d3.shuffle(recent.slice()), ...d3.shuffle(fresh)]; // cards are dealt from the end
+  }
+  const i = deck.pop();
+  const seen = [i, ...recent].slice(0, Math.max(1, Math.floor(cities.length / 2))); // the last half of what you saw
+  decks[key] = deck; decks[`${key}-recent`] = seen;
+  store.set(key, deck); store.set(`${key}-recent`, seen);
+  return cities[i];
 }
 
 function updateLegs() {
@@ -547,7 +633,7 @@ function start() {
 }
 
 function next() {
-  const t = TIERS[round], [name, country, lat, lng] = pick(t.cities);
+  const t = TIERS[round], [name, country, lat, lng] = pick(round);
   cityName = name; cityCountry = country; picked = null; pickedName = null;
   target = [lng, lat]; guess = null; flight = null; targetShown = false; phase = "guessing";
   $("pop").hidden = true; $("readout").textContent = "";
@@ -565,7 +651,7 @@ function next() {
 
 function dropPin(e) {
   if (phase !== "guessing") return;
-  const x = e.clientX, y = e.clientY;
+  const area = $("stage").getBoundingClientRect(), x = e.clientX - area.left, y = e.clientY - area.top; // tap position on the globe's own area
   if (Math.hypot(x - cx, y - cy) > projection.scale()) return; // clicked off the globe
   const ll = projection.invert([x, y]);
   if (!ll || !isFinite(ll[0])) return;
@@ -667,20 +753,21 @@ $("go").onclick = () => {
 };
 
 // ---------- Input: drag to spin, pinch or wheel to zoom, tap to pin ----------
-const pointers = new Map(); let gesture = null;
+const pointers = new Map(), stage = $("stage"); let gesture = null;
 const pinchDist = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a[0] - b[0], a[1] - b[1]); };
-node.addEventListener("pointerdown", e => {
-  node.setPointerCapture(e.pointerId); pointers.set(e.pointerId, [e.clientX, e.clientY]); spinning = false;
+stage.addEventListener("pointerdown", e => {
+  try { stage.setPointerCapture(e.pointerId); } catch {} // keeps the drag even if the finger leaves the globe
+  pointers.set(e.pointerId, [e.clientX, e.clientY]); spinning = false;
   gesture = pointers.size === 1 ? {type: "drag", x: e.clientX, y: e.clientY, rot: projection.rotate(), moved: false}
                                 : {type: "pinch", d: pinchDist(), z: zf};
 });
-node.addEventListener("pointermove", e => {
+stage.addEventListener("pointermove", e => {
   if (!pointers.has(e.pointerId)) return;
   pointers.set(e.pointerId, [e.clientX, e.clientY]);
   if (!gesture || busy) return;
   if (gesture.type === "drag") {
     const dx = e.clientX - gesture.x, dy = e.clientY - gesture.y;
-    if (!gesture.moved && Math.hypot(dx, dy) < 5) return;
+    if (!gesture.moved && Math.hypot(dx, dy) < (e.pointerType === "touch" ? 9 : 5)) return; // fingers wobble more than mice
     gesture.moved = true; node.classList.add("grabbing");
     const k = 60 / projection.scale();
     projection.rotate([gesture.rot[0] + dx * k, Math.max(-80, Math.min(80, gesture.rot[1] - dy * k)), 0]); dirty = true;
@@ -688,12 +775,13 @@ node.addEventListener("pointermove", e => {
 });
 function endPointer(e) {
   const g = gesture; pointers.delete(e.pointerId); node.classList.remove("grabbing");
-  if (g && g.type === "drag" && !g.moved && e.type === "pointerup" && !busy) dropPin(e);
+  // Drop where the finger first touched: fingers roll a little as they lift off
+  if (g && g.type === "drag" && !g.moved && e.type === "pointerup" && !busy) dropPin({clientX: g.x, clientY: g.y});
   gesture = pointers.size ? {type: "done"} : null; // lifting one finger of a pinch shouldn't drop a pin
 }
-node.addEventListener("pointerup", endPointer);
-node.addEventListener("pointercancel", endPointer);
-node.addEventListener("wheel", e => {
+stage.addEventListener("pointerup", endPointer);
+stage.addEventListener("pointercancel", endPointer);
+stage.addEventListener("wheel", e => {
   e.preventDefault(); if (busy) return;
   const dy = e.deltaY * (e.deltaMode === 1 ? 16 : 1); // some mice report lines, not pixels
   spinning = false; zGoal = clampZ(zGoal * Math.exp(-dy * .002));
@@ -702,11 +790,16 @@ const zoomBy = f => { if (busy) return; spinning = false; zGoal = clampZ(zGoal *
 $("zin").onclick = () => zoomBy(1.6);
 $("zout").onclick = () => zoomBy(1 / 1.6);
 
+// Stop Safari zooming the whole page when a pinch starts off the globe
+for (const ev of ["gesturestart", "gesturechange"]) document.addEventListener(ev, e => e.preventDefault(), {passive: false});
+// iOS can still drag or rubber-band the whole page; block that everywhere except the scrollable flight log
+document.addEventListener("touchmove", e => { if (!e.target.closest(".final")) e.preventDefault(); }, {passive: false});
+
 // ---------- Boot ----------
 layout(); requestAnimationFrame(frame);
 setFlaps("Pin the City");
 const getJSON = file => fetch(file).then(r => { if (!r.ok) throw new Error(`${file}: ${r.status}`); return r.json(); });
-Promise.all([getJSON("countries-110m.json"), getJSON("cities.json")])
+Promise.all([getJSON("countries-mid.json"), getJSON("cities.json")])
   .then(([topo, cities]) => {
     TIERS = cities.tiers;
     addMap("lo", topo);
@@ -715,6 +808,6 @@ Promise.all([getJSON("countries-110m.json"), getJSON("cities.json")])
   })
   .catch(() => {
     $("tier").textContent = "The map or city list didn't load";
-    $("hint").textContent = "Keep countries-110m.json and cities.json next to this page and open it through a local server, not by double-clicking.";
+    $("hint").textContent = "Keep countries-mid.json and cities.json next to this page and open it through a local server, not by double-clicking.";
   });
 </script>

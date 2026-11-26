@@ -18,11 +18,16 @@ GEONAMES = "https://download.geonames.org/export/dump/"
 CURATED = {
     "Landmark city": "London GB, New York City US, Paris FR, Tokyo JP, Sydney AU, Rome IT, Los Angeles US, Dubai AE, "
                      "Beijing CN, Berlin DE, Madrid ES, Hong Kong HK, Barcelona ES, Amsterdam NL, San Francisco US, "
-                     "Singapore SG, Moscow RU, Rio de Janeiro BR, Cairo EG, Toronto CA",
-    "Major city": "Mumbai IN, Istanbul TR, Bangkok TH, Mexico City MX, Seoul KR, Cape Town ZA, Chicago US, Athens GR, "
-                  "Delhi IN, Shanghai CN, Buenos Aires AR, Lisbon PT, Vienna AT, Dublin IE, Prague CZ, Stockholm SE, "
-                  "Miami US, Vancouver CA, Melbourne AU, Venice IT, Edinburgh GB, Kyoto JP, Havana CU, Lima PE, "
-                  "Nairobi KE, Jakarta ID, Manila PH, Marrakesh MA, Copenhagen DK, Montreal CA",
+                     "Singapore SG, Moscow RU, Rio de Janeiro BR, Cairo EG, Toronto CA, Venice IT, Athens GR, "
+                     "Istanbul TR, Mexico City MX, Bangkok TH, Las Vegas US, Shanghai CN, Seoul KR, Cape Town ZA, "
+                     "Buenos Aires AR, Lisbon PT, Vienna AT, Washington US",
+    "Major city": "Mumbai IN, Chicago US, Delhi IN, Dublin IE, Prague CZ, Stockholm SE, Miami US, Vancouver CA, "
+                  "Melbourne AU, Edinburgh GB, Kyoto JP, Havana CU, Lima PE, Nairobi KE, Jakarta ID, Manila PH, "
+                  "Marrakesh MA, Copenhagen DK, Montreal CA, Florence IT, Munich DE, Milan IT, Budapest HU, "
+                  "Warsaw PL, Oslo NO, Helsinki FI, Brussels BE, Zurich CH, Geneva CH, Boston US, Seattle US, "
+                  "New Orleans US, Honolulu US, Lagos NG, Johannesburg ZA, Casablanca MA, Tel Aviv IL, Jerusalem IL, "
+                  "Doha QA, Abu Dhabi AE, Kuala Lumpur MY, Hanoi VN, Ho Chi Minh City VN, Osaka JP, Taipei TW, "
+                  "Auckland NZ, Bogotá CO, Santiago CL, São Paulo BR, Reykjavik IS",
 }
 # Tiers 3-5 come from the data: (tier name, how many cities, max share for any one country)
 RANKED = [("Regional hub", 400, .06), ("Off the beaten path", 800, .05), ("Deep cut", 1500, .04)]
